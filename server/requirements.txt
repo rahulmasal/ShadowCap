@@ -1,0 +1,35 @@
+# Server dependencies
+flask>=3.0.0
+flask-cors>=4.0.0
+flask-sqlalchemy>=3.1.0
+cryptography>=41.0.0
+python-dotenv>=1.0.0
+werkzeug>=3.0.0
+gunicorn>=21.0.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+pyjwt>=2.8.0
+psutil>=5.9.0
+</task_progress>
+- [ ] Security fixes
+  - [x] Add proper authentication with JWT
+  - [x] Add CSRF protection
+  - [x] Add rate limiting
+  - [x] Secure license key transmission
+- [ ] Code quality improvements
+  - [x] Fix bare except clauses
+  - [x] Add input validation
+  - [ ] Add type hints throughout
+- [ ] Architecture improvements
+  - [x] Add database support with SQLAlchemy
+  - [x] Restructure server code with blueprints
+  - [x] Add API versioning
+- [ ] Add unit tests
+- [ ] Add Docker support
+- [ ] Add API documentation
+- [ ] Client improvements
+  - [ ] Add retry logic
+  - [ ] Add offline queue
+  - [ ] Add heartbeat
+</task_progress>
+</write_to_file>

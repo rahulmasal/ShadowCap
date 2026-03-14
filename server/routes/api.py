@@ -1,0 +1,410 @@
+"""
+API Routes for Screen Recorder Server
+Version 1 API endpoints with proper validation and error handling
+"""
+
+import logging
+from datetime import datetime
+from pathlib import Path
+from typing import Tuple, Optional
+
+from flask import Blueprint, request, jsonify, g
+from werkzeug.utils import secure_filename
+
+# Import from parent directory
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config import settings
+from models import db, Client, License, Video, AuditLog
+from auth import auth_manager, require_auth, rate_limit
+from validators import InputValidator, validate_request_data
+
+logger = logging.getLogger(__name__)
+
+# Create blueprint with URL prefix for API versioning
+api_bp = Blueprint('api', __name__, url_prefix='/api/v1')
+
+
+# ============ Error Handlers ============
+
+@api_bp.errorhandler(400)
+def bad_request(error):
+    """Handle bad request errors"""
+    return jsonify({"error": "Bad request", "details": str(error)}), 400
+
+
+@api_bp.errorhandler(401)
+def unauthorized(error):
+    """Handle unauthorized errors"""
+    return jsonify({"error": "Unauthorized", "details": str(error)}), 401
+
+
+@api_bp.errorhandler(403)
+def forbidden(error):
+    """Handle forbidden errors"""
+    return jsonify({"error": "Forbidden", "details": str(error)}), 403
+
+
+@api_bp.errorhandler(404)
+def not_found(error):
+    """Handle not found errors"""
+    return jsonify({"error": "Not found", "details": str(error)}), 404
+
+
+@api_bp.errorhandler(429)
+def rate_limit_exceeded(error):
+    """Handle rate limit errors"""
+    return jsonify({"error": "Rate limit exceeded", "details": "Please try again later"}), 429
+
+
+@api_bp.errorhandler(500)
+def internal_error(error):
+    """Handle internal server errors"""
+    logger.error(f"Internal server error: {error}")
+    return jsonify({"error": "Internal server error", "details": "An unexpected error occurred"}), 500
+
+
+# ============ Helper Functions ============
+
+def log_audit(action: str, entity_type: str, entity_id: Optional[int] = None, 
+              details: Optional[dict] = None) -> None:
+    """Log an audit entry"""
+    try:
+        log = AuditLog(
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            details=details,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')[:255]
+        )
+        db.session.add(log)
+        db.session.commit()
+    except Exception as e:
+        logger.error(f"Failed to log audit: {e}")
+
+
+def get_client_ip() -> str:
+    """Get the real client IP address"""
+    if request.headers.get('X-Forwarded-For'):
+        return request.headers['X-Forwarded-For'].split(',')[0].strip()
+    elif request.headers.get('X-Real-IP'):
+        return request.headers['X-Real-IP']
+    return request.remote_addr or 'unknown'
+
+
+# ============ License Validation Decorator ============
+
+def validate_license_in_request(f):
+    """Decorator to validate license in request"""
+    from functools import wraps
+    
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Get license from header (preferred) or form data
+        license_token = request.headers.get('X-License-Token')
+        license_key = request.form.get('license') or request.headers.get('X-License-Key')
+        machine_id = request.form.get('machine_id') or request.headers.get('X-Machine-ID')
+        
+        if not license_key and not license_token:
+            return jsonify({"error": "License key required"}), 401
+        
+        # Validate license
+        from shared.license_manager import LicenseManager
+        lm = LicenseManager()
+        
+        # Load public key
+        public_key_path = settings.keys_folder / "public_key.pem"
+        if public_key_path.exists():
+            with open(public_key_path, 'r') as f:
+                lm.load_public_key(f.read())
+        else:
+            return jsonify({"error": "Server configuration error"}), 500
+        
+        is_valid, result = lm.validate_license(license_key or license_token, machine_id)
+        
+        if not is_valid:
+            return jsonify({"error": f"Invalid license: {result}"}), 401
+        
+        # Store license data in request context
+        g.license_data = result
+        g.machine_id = machine_id
+        
+        return f(*args, **kwargs)
+    
+    return decorated_function
+
+
+# ============ Upload Routes ============
+
+@api_bp.route('/upload', methods=['POST'])
+@rate_limit(limit=30, window=60)
+@validate_license_in_request
+def upload_video():
+    """Handle video upload from client"""
+    try:
+        # Validate file
+        if 'video' not in request.files:
+            return jsonify({"error": "No video file provided"}), 400
+        
+        file = request.files['video']
+        
+        if file.filename == '':
+            return jsonify({"error": "No file selected"}), 400
+        
+        # Validate file extension
+        is_valid, error = InputValidator.validate_file_extension(
+            file.filename, settings.allowed_extensions
+        )
+        if not is_valid:
+            return jsonify({"error": error}), 400
+        
+        # Validate filename
+        is_valid, error = InputValidator.validate_filename(file.filename)
+        if not is_valid:
+            return jsonify({"error": error}), 400
+        
+        machine_id = g.machine_id
+        timestamp = request.form.get('timestamp', datetime.utcnow().isoformat())
+        
+        # Get or create client
+        client = db.session.execute(
+            db.select(Client).where(Client.machine_id == machine_id)
+        ).scalar_one_or_none()
+        
+        if client is None:
+            client = Client(machine_id=machine_id)
+            db.session.add(client)
+            db.session.flush()
+        
+        # Update last seen
+        client.last_seen = datetime.utcnow()
+        
+        # Create client-specific folder
+        client_folder = settings.upload_folder / machine_id
+        client_folder.mkdir(parents=True, exist_ok=True)
+        
+        # Generate unique filename
+        filename = secure_filename(file.filename)
+        date_prefix = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        unique_filename = f"{date_prefix}_{filename}"
+        filepath = client_folder / unique_filename
+        
+        # Save file
+        file.save(filepath)
+        file_size = filepath.stat().st_size
+        
+        # Create video record
+        video = Video(
+            filename=unique_filename,
+            original_filename=filename,
+            file_path=str(filepath),
+            file_size=file_size,
+            client_id=client.id,
+            client_timestamp=datetime.fromisoformat(timestamp) if timestamp else None
+        )
+        db.session.add(video)
+        db.session.commit()
+        
+        # Log audit
+        log_audit(
+            action="video_upload",
+            entity_type="video",
+            entity_id=video.id,
+            details={"filename": unique_filename, "size": file_size}
+        )
+        
+        logger.info(f"Video uploaded: {unique_filename} from {machine_id}")
+        
+        return jsonify({
+            "success": True,
+            "message": "Video uploaded successfully",
+            "filename": unique_filename,
+            "video_id": video.id
+        })
+        
+    except Exception as e:
+        logger.error(f"Upload error: {e}", exc_info=True)
+        db.session.rollback()
+        return jsonify({"error": "Internal server error", "details": "An unexpected error occurred"}), 500
+
+
+# ============ License Routes ============
+
+@api_bp.route('/validate-license', methods=['POST'])
+@rate_limit(limit=10, window=60)
+def validate_license():
+    """Validate a license key"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"valid": False, "error": "No data provided"}), 400
+        
+        license_key = data.get('license')
+        machine_id = data.get('machine_id')
+        
+        # Validate inputs
+        is_valid, error = InputValidator.validate_license_key(license_key)
+        if not is_valid:
+            return jsonify({"valid": False, "error": error}), 400
+        
+        if machine_id:
+            is_valid, error = InputValidator.validate_machine_id(machine_id)
+            if not is_valid:
+                return jsonify({"valid": False, "error": error}), 400
+        
+        # Validate license
+        from shared.license_manager import LicenseManager
+        lm = LicenseManager()
+        
+        public_key_path = settings.keys_folder / "public_key.pem"
+        if public_key_path.exists():
+            with open(public_key_path, 'r') as f:
+                lm.load_public_key(f.read())
+        else:
+            return jsonify({"valid": False, "error": "Server configuration error"}), 500
+        
+        is_valid, result = lm.validate_license(license_key, machine_id)
+        
+        return jsonify({
+            "valid": is_valid,
+            "data": result if is_valid else None,
+            "error": None if is_valid else result
+        })
+        
+    except Exception as e:
+        logger.error(f"License validation error: {e}", exc_info=True)
+        return jsonify({"valid": False, "error": "Internal server error"}), 500
+
+
+# ============ Client Routes ============
+
+@api_bp.route('/heartbeat', methods=['POST'])
+@rate_limit(limit=60, window=60)
+@validate_license_in_request
+def heartbeat():
+    """Receive heartbeat from client"""
+    try:
+        machine_id = g.machine_id
+        
+        # Get or create client
+        client = db.session.execute(
+            db.select(Client).where(Client.machine_id == machine_id)
+        ).scalar_one_or_none()
+        
+        if client is None:
+            client = Client(machine_id=machine_id)
+            db.session.add(client)
+        else:
+            client.last_seen = datetime.utcnow()
+            client.is_active = True
+        
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": "Heartbeat received",
+            "server_time": datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Heartbeat error: {e}", exc_info=True)
+        db.session.rollback()
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@api_bp.route('/get-machine-id', methods=['GET'])
+def get_machine_id():
+    """Get machine ID for the requesting client"""
+    try:
+        from shared.license_manager import MachineIdentifier
+        machine_id = MachineIdentifier.get_machine_id()
+        return jsonify({"machine_id": machine_id})
+    except Exception as e:
+        logger.error(f"Get machine ID error: {e}", exc_info=True)
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@api_bp.route('/get-public-key', methods=['GET'])
+def get_public_key():
+    """Get the public key for client embedding"""
+    try:
+        public_key_path = settings.keys_folder / "public_key.pem"
+        if public_key_path.exists():
+            with open(public_key_path, 'r') as f:
+                return jsonify({"public_key": f.read()})
+        return jsonify({"error": "Public key not found"}), 404
+    except Exception as e:
+        logger.error(f"Get public key error: {e}", exc_info=True)
+        return jsonify({"error": "Internal server error"}), 500
+
+
+# ============ Health Check ============
+
+@api_bp.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for monitoring"""
+    return jsonify({
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": "1.0.0"
+    })
+
+
+# ============ Legacy API Routes (for backward compatibility) ============
+
+# These routes maintain backward compatibility with older clients
+legacy_bp = Blueprint('legacy', __name__, url_prefix='/api')
+
+
+@legacy_bp.route('/upload', methods=['POST'])
+@rate_limit(limit=30, window=60)
+@validate_license_in_request
+def legacy_upload():
+    """Legacy upload endpoint - redirects to v1"""
+    return upload_video()
+
+
+@legacy_bp.route('/validate-license', methods=['POST'])
+@rate_limit(limit=10, window=60)
+def legacy_validate_license():
+    """Legacy validate license endpoint"""
+    return validate_license()
+
+
+@legacy_bp.route('/get-machine-id', methods=['GET'])
+def legacy_get_machine_id():
+    """Legacy get machine ID endpoint"""
+    return get_machine_id()
+
+
+@legacy_bp.route('/get-public-key', methods=['GET'])
+def legacy_get_public_key():
+    """Legacy get public key endpoint"""
+    return get_public_key()
+</task_progress>
+- [ ] Security fixes
+  - [x] Add proper authentication with JWT
+  - [x] Add CSRF protection
+  - [x] Add rate limiting
+  - [x] Secure license key transmission
+- [ ] Code quality improvements
+  - [x] Fix bare except clauses
+  - [x] Add input validation
+  - [ ] Add type hints throughout
+- [ ] Architecture improvements
+  - [x] Add database support with SQLAlchemy
+  - [x] Restructure server code with blueprints
+  - [x] Add API versioning
+- [ ] Add unit tests
+- [ ] Add Docker support
+- [ ] Add API documentation
+- [ ] Client improvements
+  - [ ] Add retry logic
+  - [ ] Add offline queue
+  - [ ] Add heartbeat
+</task_progress>
+</write_to_file>
