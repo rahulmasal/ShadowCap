@@ -237,8 +237,8 @@ See [`server/migrations/README.md`](server/migrations/README.md) for detailed mi
 
 3. **The built files will be in the `dist` directory:**
    - `ScreenRecorderClient.exe` - The client executable
-   - `install.bat` - Installation script
-   - `uninstall.bat` - Uninstallation script
+   - `install_client_service.bat` - Installation script
+   - `uninstall_client_service.bat` - Uninstallation script
 
 ## Usage
 
@@ -270,13 +270,13 @@ See [`server/migrations/README.md`](server/migrations/README.md) for detailed mi
 1. **Copy files to client machine:**
    - `ScreenRecorderClient.exe`
    - `license.key`
-   - `install.bat`
+   - `install_client_service.bat`
 
-2. **Edit `install.bat`:**
+2. **Edit `install_client_service.bat`:**
    - Change `YOUR_SERVER_IP` to your server's IP address
 
 3. **Run as administrator:**
-   - Right-click `install.bat`
+   - Right-click `install_client_service.bat`
    - Select "Run as administrator"
 
 4. **The service will:**
@@ -430,7 +430,7 @@ The test suite covers:
 
 ### Service won't install
 
-- Run `install.bat` as administrator
+- Run `install_client_service.bat` as administrator
 - Check if antivirus is blocking
 - Verify Python is installed
 
@@ -536,10 +536,3 @@ This project is for educational and authorized use only. Ensure compliance with 
 ## Disclaimer
 
 This software is provided as-is. Users are responsible for ensuring legal compliance when recording screens. The authors are not responsible for any misuse of this software.
-</task_progress>
-
-- [x] All improvements implemented
-- [x] Update README.md documentation
-- [ ] Update WORKFLOW.md documentation
-      </task_progress>
-      </write_to_file>
