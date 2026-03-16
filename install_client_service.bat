@@ -22,6 +22,9 @@ set SHARED_DIR=%SCRIPT_DIR%shared
 echo Step 1: Creating installation directory...
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 if not exist "%INSTALL_DIR%\logs" mkdir "%INSTALL_DIR%\logs"
+if not exist "%APPDATA%\ScreenRecSvc" mkdir "%APPDATA%\ScreenRecSvc"
+if not exist "%APPDATA%\ScreenRecSvc\recordings" mkdir "%APPDATA%\ScreenRecSvc\recordings"
+if not exist "%APPDATA%\ScreenRecSvc\offline_queue" mkdir "%APPDATA%\ScreenRecSvc\offline_queue"
 echo Done.
 pause
 
@@ -42,23 +45,102 @@ if not exist "%INSTALL_DIR%\venv" (
 pause
 
 echo Step 4: Installing dependencies...
-call "%INSTALL_DIR%\venv\Scripts\activate.bat"
-pip install -r "%INSTALL_DIR%\requirements.txt"
+"%INSTALL_DIR%\venv\Scripts\pip.exe" install -r "%INSTALL_DIR%\requirements.txt"
 echo Done.
 pause
 
-echo Step 5: Installing Windows service (using client's built-in service installer)...
-call "%INSTALL_DIR%\venv\Scripts\python.exe" "%INSTALL_DIR%\screen_recorder.py" --install
-if %errorLevel% neq 0 (
-    echo ERROR: Failed to install client service.
-    pause
-    exit /b 1
+echo Step 5: Configuring Server IP...
+set /p SERVER_IP="Enter Server IP address (e.g., 192.168.1.100): "
+if "%SERVER_IP%"=="" (
+    set SERVER_IP=localhost
 )
-echo Client service installed.
+echo Creating config file with server URL: http://%SERVER_IP%:5000
+echo {"server_url": "http://%SERVER_IP%:5000"} > "%APPDATA%\ScreenRecSvc\config.json"
+echo Done.
 pause
 
-echo Step 6: Starting service...
-sc start ScreenRecSvc
+echo Step 6: Checking for NSSM...
+if not exist "%SCRIPT_DIR%nssm.exe" (
+    echo NSSM not found. Attempting to download...
+    curl -L --max-time 30 -o "%SCRIPT_DIR%nssm.zip" https://nssm.cc/release/nssm-2.24.zip
+    if not exist "%SCRIPT_DIR%nssm.zip" (
+        echo ERROR: Failed to download NSSM.
+        echo.
+        echo Please download NSSM manually:
+        echo 1. Go to https://nssm.cc/download
+        echo 2. Download nssm-2.24.zip
+        echo 3. Extract nssm.exe from the win64 folder
+        echo 4. Place nssm.exe in: %SCRIPT_DIR%
+        echo 5. Run this script again
+        pause
+        exit /b 1
+    )
+    echo Extracting NSSM...
+    tar -xf "%SCRIPT_DIR%nssm.zip" -C "%SCRIPT_DIR%"
+    if not exist "%SCRIPT_DIR%nssm-2.24\win64\nssm.exe" (
+        echo ERROR: Failed to extract NSSM properly.
+        echo.
+        echo Please download NSSM manually:
+        echo 1. Go to https://nssm.cc/download
+        echo 2. Download nssm-2.24.zip
+        echo 3. Extract nssm.exe from the win64 folder
+        echo 4. Place nssm.exe in: %SCRIPT_DIR%
+        echo 5. Run this script again
+        if exist "%SCRIPT_DIR%nssm.zip" del "%SCRIPT_DIR%nssm.zip"
+        pause
+        exit /b 1
+    )
+    copy "%SCRIPT_DIR%nssm-2.24\win64\nssm.exe" "%SCRIPT_DIR%nssm.exe"
+    rmdir /s /q "%SCRIPT_DIR%nssm-2.24"
+    del "%SCRIPT_DIR%nssm.zip"
+    echo NSSM downloaded and extracted successfully.
+) else (
+    echo NSSM already exists, skipping download.
+)
+pause
+
+echo Step 6: Copying license and public key if present...
+if exist "%SCRIPT_DIR%license.key" (
+    copy /Y "%SCRIPT_DIR%license.key" "%INSTALL_DIR%\license.key"
+    echo license.key copied to %INSTALL_DIR%.
+) else (
+    echo WARNING: license.key not found in %SCRIPT_DIR%
+    echo Place license.key at %INSTALL_DIR%\license.key before starting the service.
+)
+if exist "%SCRIPT_DIR%public_key.pem" (
+    copy /Y "%SCRIPT_DIR%public_key.pem" "%INSTALL_DIR%\public_key.pem"
+    echo public_key.pem copied to %INSTALL_DIR%.
+) else (
+    echo WARNING: public_key.pem not found in %SCRIPT_DIR%
+    echo Get it from the server at C:\ScreenRecorderServer\keys\public_key.pem
+)
+pause
+
+echo Step 7: Removing any existing service before installing...
+"%SCRIPT_DIR%nssm.exe" stop ScreenRecSvc >nul 2>&1
+"%SCRIPT_DIR%nssm.exe" remove ScreenRecSvc confirm >nul 2>&1
+timeout /t 3 /nobreak >nul
+
+echo Step 8: Installing Windows service...
+"%SCRIPT_DIR%nssm.exe" install ScreenRecSvc "%INSTALL_DIR%\venv\Scripts\python.exe" "%INSTALL_DIR%\screen_recorder.py"
+"%SCRIPT_DIR%nssm.exe" set ScreenRecSvc AppDirectory "%INSTALL_DIR%"
+"%SCRIPT_DIR%nssm.exe" set ScreenRecSvc DisplayName "Screen Recording Service"
+"%SCRIPT_DIR%nssm.exe" set ScreenRecSvc Description "Automatic screen recording service"
+"%SCRIPT_DIR%nssm.exe" set ScreenRecSvc Start SERVICE_AUTO_START
+"%SCRIPT_DIR%nssm.exe" set ScreenRecSvc AppStdout "%INSTALL_DIR%\logs\service.log"
+"%SCRIPT_DIR%nssm.exe" set ScreenRecSvc AppStderr "%INSTALL_DIR%\logs\service_error.log"
+"%SCRIPT_DIR%nssm.exe" set ScreenRecSvc AppRotateFiles 1
+"%SCRIPT_DIR%nssm.exe" set ScreenRecSvc AppRotateOnline 1
+"%SCRIPT_DIR%nssm.exe" set ScreenRecSvc AppRotateSeconds 86400
+"%SCRIPT_DIR%nssm.exe" set ScreenRecSvc AppRotateBytes 1048576
+:: Do not restart when process exits cleanly (no license = exit 0)
+"%SCRIPT_DIR%nssm.exe" set ScreenRecSvc AppExit Default Restart
+"%SCRIPT_DIR%nssm.exe" set ScreenRecSvc AppExit 0 Exit
+echo Service installed.
+pause
+
+echo Step 9: Starting service...
+"%SCRIPT_DIR%nssm.exe" start ScreenRecSvc
 if %errorLevel% neq 0 (
     echo ERROR: Failed to start service. Error code: %errorLevel%
     echo Check the service logs at: %INSTALL_DIR%\logs\
@@ -75,7 +157,6 @@ echo ================================================
 echo.
 echo Service Name: ScreenRecSvc
 echo Installation Directory: %INSTALL_DIR%
-echo Client Directory: %INSTALL_DIR%\client
 echo Logs Directory: %INSTALL_DIR%\logs
 echo.
 echo The client will start automatically on system boot.

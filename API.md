@@ -365,7 +365,6 @@ Events:
   - [x] Restructure server code with blueprints
   - [x] Add API versioning
 - [x] Add unit tests
-- [x] Add Docker support
 - [x] Add API documentation
 - [x] Client improvements
   - [x] Add retry logic

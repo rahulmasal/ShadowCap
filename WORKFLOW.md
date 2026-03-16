@@ -66,9 +66,6 @@ Step 1: Start the Server
 $ cd ScreenRecorderApp
 $ start_server.bat
 
-Or with Docker:
-$ docker-compose up -d
-
 This will:
 ├── Create virtual environment
 ├── Install dependencies (Flask, SQLAlchemy, cryptography, etc.)
@@ -507,9 +504,6 @@ Response:
 # Start server
 start_server.bat
 
-# Or with Docker
-docker-compose up -d
-
 # Get machine ID
 python get_machine_id.py
 
@@ -528,11 +522,6 @@ install.bat
 # Uninstall service (run as admin)
 uninstall.bat
 
-# View Docker logs
-docker-compose logs -f
-
-# Stop Docker services
-docker-compose down
 ```
 
 ---
@@ -544,9 +533,6 @@ docker-compose down
 ```bash
 # API health check
 curl http://localhost:5000/api/v1/health
-
-# Docker health check
-docker inspect --format='{{.State.Health.Status}}' screenrecorder-server
 ```
 
 ### Logs
@@ -558,8 +544,6 @@ tail -f server/logs/app.log
 # Client logs (on client PC)
 type %APPDATA%\ScreenRecSvc\service.log
 
-# Docker logs
-docker-compose logs -f server
 ```
 
 ### Database Queries

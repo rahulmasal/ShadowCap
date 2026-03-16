@@ -23,7 +23,6 @@ A comprehensive auto screen recording application for Windows with client-server
 - **Heartbeat**: Client heartbeat for connection monitoring
 - **Rate Limiting**: API rate limiting to prevent abuse
 - **CSRF Protection**: Secure forms with CSRF tokens
-- **Docker Support**: Containerized deployment with Docker Compose
 
 ## Architecture
 
@@ -74,8 +73,6 @@ ScreenRecorderApp/
 │   └── license_manager.py     # License generation/validation
 ├── tests/                     # Unit tests
 │   └── test_server.py         # Server tests
-├── Dockerfile                 # Docker image definition
-├── docker-compose.yml         # Docker Compose configuration
 ├── API.md                     # API documentation
 ├── WORKFLOW.md                # Workflow documentation
 ├── build_client.py            # Build script for client
@@ -118,26 +115,9 @@ ScreenRecorderApp/
    python app.py
    ```
 
-#### Option 2: Docker Deployment
+#### Option 2: Windows Service
 
-1. **Using Docker Compose:**
-
-   ```bash
-   docker-compose up -d
-   ```
-
-2. **With nginx reverse proxy (production):**
-
-   ```bash
-   docker-compose --profile production up -d
-   ```
-
-3. **Access the admin dashboard:**
-   Open `http://localhost:5000/admin` in your browser
-
-#### Option 3: Windows Service (No Docker)
-
-For production deployment without Docker, install as a Windows service:
+For production deployment, install as a Windows service:
 
 1. **Run as administrator:**
 
@@ -509,25 +489,6 @@ Before deploying to production:
    - Add model in `server/models.py`
    - Create migration if needed
    - Update admin dashboard
-
-## Docker Commands
-
-```bash
-# Build image
-docker build -t screenrecorder-server .
-
-# Run container
-docker run -d -p 5000:5000 screenrecorder-server
-
-# Using Docker Compose
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-```
 
 ## License
 

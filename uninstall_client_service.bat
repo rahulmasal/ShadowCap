@@ -14,10 +14,11 @@ if %errorLevel% neq 0 (
 )
 
 :: Set paths
+set INSTALL_DIR=C:\ScreenRecorderClient
 set SCRIPT_DIR=%~dp0
 
 echo Step 1: Stopping service...
-sc stop ScreenRecSvc
+"%SCRIPT_DIR%nssm.exe" stop ScreenRecSvc
 if %errorLevel% neq 0 (
     echo WARNING: Failed to stop service. Error code: %errorLevel%
     echo The service might not be running.
@@ -44,8 +45,6 @@ if %errorLevel% neq 0 (
 pause
 
 echo Step 3: Cleaning up installation directory...
-set /p INSTALL_DIR=Enter installation directory to clean (default: C:\ScreenRecorderClient): 
-if "%INSTALL_DIR%"=="" set INSTALL_DIR=C:\ScreenRecorderClient
 if exist "%INSTALL_DIR%" (
     echo Removing installation directory: %INSTALL_DIR%
     rmdir /s /q "%INSTALL_DIR%"
