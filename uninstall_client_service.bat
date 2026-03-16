@@ -54,6 +54,17 @@ if exist "%INSTALL_DIR%" (
 )
 pause
 
+echo Step 4: Cleaning up AppData directory...
+set APPDATA_DIR=%APPDATA%\ScreenRecSvc
+if exist "%APPDATA_DIR%" (
+    echo Removing AppData directory: %APPDATA_DIR%
+    rmdir /s /q "%APPDATA_DIR%"
+    echo AppData directory removed.
+) else (
+    echo AppData directory not found: %APPDATA_DIR%
+)
+pause
+
 echo.
 echo ================================================
 echo   Uninstallation Complete!
