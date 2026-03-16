@@ -55,7 +55,13 @@ if "%SERVER_IP%"=="" (
     set SERVER_IP=localhost
 )
 echo Creating config file with server URL: http://%SERVER_IP%:5000
-echo {"server_url": "http://%SERVER_IP%:5000"} > "%APPDATA%\ScreenRecSvc\config.json"
+set CONFIG_DIR=%PROGRAMDATA%\ScreenRecSvc
+if not exist "%CONFIG_DIR%" mkdir "%CONFIG_DIR%"
+(
+    echo {"server_url": "http://%SERVER_IP%:5000"}
+) > "%CONFIG_DIR%\config.json"
+type "%CONFIG_DIR%\config.json"
+echo Config file written to: %CONFIG_DIR%\config.json
 echo Done.
 pause
 
