@@ -565,6 +565,11 @@ class ScreenRecorder:
         # MSS is not thread-safe, create instance in this thread
         sct = mss.mss()
 
+        # Log all available monitors for debugging
+        logger.info(f"[RECORD] Number of monitors detected: {len(sct.monitors)}")
+        for i, monitor in enumerate(sct.monitors):
+            logger.info(f"[RECORD] Monitor {i}: {monitor}")
+
         fps = self.config.recording_fps
         chunk_duration = self.config.chunk_duration
 
@@ -587,10 +592,14 @@ class ScreenRecorder:
         )
 
         frames_captured = 0
+        consecutive_black_frames = 0
+        max_black_frames_before_warning = 30  # Warn after ~3 seconds at 10fps
+        monitor_to_use = 1  # Default to primary monitor
+
         while not self._stop_event.is_set():
             try:
-                # Capture screen
-                screenshot = sct.grab(sct.monitors[1])
+                # Capture screen from selected monitor
+                screenshot = sct.grab(sct.monitors[monitor_to_use])
                 frame = np.array(screenshot)
 
                 # Validate we got a valid frame
@@ -609,6 +618,40 @@ class ScreenRecorder:
                         sample = frame[5:10, 5:10]
                         logger.info(
                             f"[RECORD] Sample pixel values (BGRA): {sample.flatten()[:12]}"
+                        )
+
+                # Check if frame appears to be black (all zeros or very low values)
+                if frames_captured < 100:  # Only check first 100 frames to avoid spam
+                    mean_val = np.mean(frame)
+                    if mean_val < 5:  # Very dark frame
+                        consecutive_black_frames += 1
+                        if consecutive_black_frames == max_black_frames_before_warning:
+                            logger.warning(
+                                f"[RECORD] Detected {consecutive_black_frames} consecutive dark frames "
+                                f"(mean pixel value: {mean_val:.2f}). This may indicate a screen capture issue."
+                            )
+                            # Try to capture from different monitors as fallback
+                            for test_monitor_idx in range(1, min(len(sct.monitors), 5)):
+                                try:
+                                    test_shot = sct.grab(sct.monitors[test_monitor_idx])
+                                    test_frame = np.array(test_shot)
+                                    if test_frame.size > 0:
+                                        test_mean = np.mean(test_frame)
+                                        logger.info(
+                                            f"[RECORD] Monitor {test_monitor_idx} mean pixel value: {test_mean:.2f}"
+                                        )
+                                        if test_mean > mean_val + 10:
+                                            logger.info(
+                                                f"[RECORD] Switching to monitor {test_monitor_idx} for capture"
+                                            )
+                                            monitor_to_use = test_monitor_idx
+                                except Exception as monitor_err:
+                                    logger.debug(
+                                        f"[RECORD] Error testing monitor {test_monitor_idx}: {monitor_err}"
+                                    )
+                    else:
+                        consecutive_black_frames = (
+                            0  # Reset counter if we get a bright frame
                         )
 
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
@@ -646,6 +689,9 @@ class ScreenRecorder:
                         return
                     logger.info(f"[RECORD] Started new video chunk: {video_path.name}")
                     frames_captured = 0
+                    consecutive_black_frames = (
+                        0  # Reset black frame counter for new chunk
+                    )
 
                 time.sleep(1.0 / fps)
             except Exception as e:
