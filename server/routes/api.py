@@ -15,7 +15,16 @@ from werkzeug.utils import secure_filename
 import sys
 import os
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_server_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _server_dir)
+
+# Check for shared module in multiple locations (same pattern as app.py)
+_shared_same_level = os.path.join(_server_dir, "shared")
+_shared_parent_level = os.path.join(_server_dir, "..", "shared")
+if os.path.isdir(_shared_same_level):
+    sys.path.insert(0, _shared_same_level)
+else:
+    sys.path.insert(0, _shared_parent_level)
 
 from config import settings
 from models import db, Client, License, Video, AuditLog
@@ -135,7 +144,7 @@ def validate_license_in_request(f):
             return jsonify({"error": "License key required"}), 401
 
         # Validate license
-        from shared.license_manager import LicenseManager
+        from license_manager import LicenseManager
 
         lm = LicenseManager()
 
@@ -293,7 +302,7 @@ def validate_license():
                 return jsonify({"valid": False, "error": error}), 400
 
         # Validate license
-        from shared.license_manager import LicenseManager
+        from license_manager import LicenseManager
 
         lm = LicenseManager()
 
@@ -370,7 +379,7 @@ def heartbeat():
 def get_machine_id():
     """Get machine ID for the requesting client"""
     try:
-        from shared.license_manager import MachineIdentifier
+        from license_manager import MachineIdentifier
 
         machine_id = MachineIdentifier.get_machine_id()
         return jsonify({"machine_id": machine_id})

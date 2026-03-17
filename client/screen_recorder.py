@@ -300,7 +300,7 @@ class OfflineQueue:
 
         if current_size + video_size > self.max_storage_bytes:
             logger.warning(
-                "[OfflineQueue] Offline storage limit reached ({current_size} + {video_size} > {self.max_storage_bytes}), removing oldest videos"
+                f"[OfflineQueue] Offline storage limit reached ({current_size} + {video_size} > {self.max_storage_bytes}), removing oldest videos"
             )
             self._remove_oldest_until_fits(video_size)
 
@@ -1424,14 +1424,33 @@ def install_as_service() -> None:
 
 
 if __name__ == "__main__":
-    # Check if installing as service or running directly
-    if len(sys.argv) > 1 and sys.argv[1] in ("install", "--install"):
-        # Normalize to pywin32's expected 'install' argument
-        sys.argv[1] = "install"
-        install_as_service()
-    elif len(sys.argv) > 1 and sys.argv[1] in ("remove", "--uninstall"):
-        sys.argv[1] = "remove"
-        install_as_service()
+    # Check for CLI flags
+    if len(sys.argv) > 1:
+        if sys.argv[1] in ("install", "--install"):
+            # Normalize to pywin32's expected 'install' argument
+            sys.argv[1] = "install"
+            install_as_service()
+        elif sys.argv[1] in ("remove", "--uninstall"):
+            sys.argv[1] = "remove"
+            install_as_service()
+        elif sys.argv[1] in ("--get-id", "-g"):
+            # Print machine ID and exit
+            print(f"Your Machine ID: {MachineIdentifier.get_machine_id()}")
+            sys.exit(0)
+        elif sys.argv[1] in ("--help", "-h"):
+            print("Screen Recorder Client")
+            print("")
+            print("Usage:")
+            print("  python screen_recorder.py          Start recording (hidden)")
+            print("  python screen_recorder.py --get-id Print machine ID")
+            print("  python screen_recorder.py --install Install as Windows service")
+            print("  python screen_recorder.py --uninstall Remove Windows service")
+            print("  python screen_recorder.py --help   Show this help message")
+            sys.exit(0)
+        else:
+            print(f"Unknown argument: {sys.argv[1]}")
+            print("Use --help for usage information")
+            sys.exit(1)
     else:
         # Run as hidden process
         runner = HiddenRunner()
