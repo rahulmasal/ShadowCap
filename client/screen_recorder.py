@@ -536,6 +536,19 @@ class ScreenRecorder:
         self._stop_event = threading.Event()
         self._pause_event = threading.Event()
 
+        # Register signal handlers for graceful shutdown
+        if sys.platform == "win32":
+            import signal as signal_module
+
+            signal_module.signal(signal_module.SIGINT, self._signal_handler)
+            signal_module.signal(signal_module.SIGTERM, self._signal_handler)
+        else:
+            import signal as signal_module
+
+            signal_module.signal(signal_module.SIGINT, self._signal_handler)
+            signal_module.signal(signal_module.SIGTERM, self._signal_handler)
+            signal_module.signal(signal_module.SIGHUP, self._signal_handler)
+
         # Audio recording
         self.audio_stream: Optional[Any] = None
         self.audio_queue: Optional[queue.Queue] = None
@@ -580,6 +593,34 @@ class ScreenRecorder:
         self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
 
         logger.info(f"ScreenRecorder initialized. Machine ID: {self.machine_id}")
+
+    def _signal_handler(self, signum, frame) -> None:
+        """Handle shutdown signals gracefully.
+
+        Args:
+            signum: Signal number
+            frame: Current stack frame
+        """
+        signal_name = {
+            2: "SIGINT",
+            15: "SIGTERM",
+            1: "SIGHUP",
+        }.get(signum, f"Signal {signum}")
+
+        logger.info(f"[SIGNAL] Received {signal_name}, initiating graceful shutdown...")
+
+        # Set stop event to signal all threads to stop
+        self._stop_event.set()
+
+        # Clear pause event if set (in case we're paused)
+        self._pause_event.clear()
+
+        # Update state
+        self.state = ClientState.STOPPED
+
+        logger.info(
+            "[SIGNAL] Graceful shutdown initiated, waiting for threads to complete..."
+        )
 
     def _load_public_key(self) -> None:
         """Load public key embedded in the application"""
@@ -859,13 +900,41 @@ class ScreenRecorder:
 
         return True
 
-    def stop_recording(self) -> None:
-        """Stop screen recording"""
+    def stop_recording(self, timeout: float = 5.0) -> None:
+        """Stop screen recording gracefully.
+
+        Args:
+            timeout: Maximum time in seconds to wait for threads to complete
+        """
         logger.info("[STOP] Stopping recording...")
         self._stop_event.set()
         self._pause_event.clear()  # Clear pause if set
         self.state = ClientState.STOPPED
         logger.info("[STOP] State set to STOPPED, stop event set")
+
+        # Wait for recording thread to finish
+        if self.recording_thread is not None and self.recording_thread.is_alive():
+            logger.info(
+                f"[STOP] Waiting for recording thread to complete (timeout: {timeout}s)..."
+            )
+            self.recording_thread.join(timeout=timeout)
+            if self.recording_thread.is_alive():
+                logger.warning(
+                    "[STOP] Recording thread did not complete within timeout"
+                )
+            else:
+                logger.info("[STOP] Recording thread completed")
+
+        # Wait for upload thread to finish
+        if self.upload_thread is not None and self.upload_thread.is_alive():
+            logger.info(
+                f"[STOP] Waiting for upload thread to complete (timeout: {timeout}s)..."
+            )
+            self.upload_thread.join(timeout=timeout)
+            if self.upload_thread.is_alive():
+                logger.warning("[STOP] Upload thread did not complete within timeout")
+            else:
+                logger.info("[STOP] Upload thread completed")
 
         if self.video_writer is not None:
             logger.info("[STOP] Releasing video writer")
@@ -1472,11 +1541,14 @@ class HiddenRunner:
             return False
 
     def stop(self) -> None:
-        """Stop the screen recorder"""
+        """Stop the screen recorder gracefully."""
+        logger.info("[RUNNER] Stopping screen recorder service...")
+        self.running = False  # Set this first so main loop exits
         if self.recorder:
-            self.recorder.stop_recording()
-        self.running = False
-        logger.info("Screen recorder service stopped")
+            self.recorder.stop_recording(
+                timeout=10.0
+            )  # Give threads more time to complete
+        logger.info("[RUNNER] Screen recorder service stopped")
 
     def _hide_console(self) -> None:
         """Hide the console window on Windows"""
@@ -1490,13 +1562,25 @@ class HiddenRunner:
             pass
 
     def run_forever(self) -> None:
-        """Run the service until stopped"""
+        """Run the service until stopped with signal handling."""
         if self.start():
             try:
+                # Main loop - check for stop signal periodically
                 while self.running:
-                    time.sleep(1)
+                    # Sleep in small increments to allow signal handlers to interrupt
+                    # This ensures we can respond to signals promptly
+                    for _ in range(10):  # 1 second total, in 0.1s increments
+                        time.sleep(0.1)
+                        if not self.running:
+                            break
             except KeyboardInterrupt:
-                pass
+                logger.info("[RUNNER] Keyboard interrupt received, stopping...")
+            except SystemExit:
+                logger.info("[RUNNER] System exit received, stopping...")
+            except Exception as e:
+                logger.error(
+                    f"[RUNNER] Unexpected error in main loop: {e}", exc_info=True
+                )
             finally:
                 self.stop()
 

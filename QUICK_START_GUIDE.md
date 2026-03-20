@@ -10,6 +10,27 @@ This is the easiest way to get started with Screen Recorder. Follow these simple
 
 ## Part 1: Install the Server (5 minutes)
 
+### Option A: Docker Installation (Recommended)
+
+If you have Docker installed, this is the easiest way:
+
+1. Download the ScreenRecorderApp ZIP file
+2. Right-click the ZIP file → "Extract All..."
+3. Open Command Prompt (or PowerShell)
+4. Navigate to the folder:
+   ```bash
+   cd Desktop\ScreenRecorderApp
+   ```
+5. Start the server with Docker:
+   ```bash
+   docker-compose up -d
+   ```
+6. Wait for the download and setup to complete (1-2 minutes first time)
+
+### Option B: Manual Installation
+
+If you don't have Docker, follow these steps:
+
 ### Step 1: Download and Extract
 
 1. Download the ScreenRecorderApp ZIP file

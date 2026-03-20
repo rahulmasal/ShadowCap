@@ -435,7 +435,216 @@ Thumbnail Generation Flow:
    └── Return thumbnail
 ```
 
----
+### Graceful Shutdown
+
+```
+Graceful Shutdown Flow:
+───────────────────────
+
+When client receives shutdown signal (SIGINT, SIGTERM, SIGHUP):
+
+1. SIGNAL HANDLING
+   ├── Signal handler registered in __init__
+   ├── SIGINT (Ctrl+C)
+   ├── SIGTERM (service stop)
+   └── SIGHUP (terminal close)
+
+2. SHUTDOWN SEQUENCE
+   ├── Set _running = False
+   ├── Set _upload_running = False
+   ├── Stop recording:
+   │   ├── Set _recording = False
+   │   ├── Wait for recording thread (timeout: 5s)
+   │   ├── Save current video chunk
+   │   └── Close video writer
+   ├── Stop heartbeat:
+   │   ├── Set _heartbeat_running = False
+   │   └── Wait for heartbeat thread (timeout: 5s)
+   ├── Stop upload:
+   │   ├── Set _upload_running = False
+   │   └── Wait for upload thread (timeout: 5s)
+   └── Log shutdown completion
+
+3. RESPONSIVE SHUTDOWN
+   ├── Main loop increments in 0.1s steps
+   ├── Checks _running flag frequently
+   ├── Responds to signals within 0.1s
+   └── Ensures no data loss during shutdown
+```
+
+### Custom Exceptions
+
+```
+Exception Hierarchy:
+────────────────────
+
+ScreenRecorderError (Base)
+├── LicenseError
+│   ├── LicenseExpiredError
+│   ├── LicenseInvalidError
+│   └── LicenseMachineMismatchError
+├── UploadError
+│   ├── UploadFailedError
+│   └── UploadSizeExceededError
+├── SessionError
+│   ├── SessionZeroError
+│   └── SessionRelaunchError
+├── RecordingError
+│   ├── RecordingStartError
+│   ├── RecordingStopError
+│   └── VideoWriterError
+├── AudioError
+├── ConfigurationError
+├── NetworkError
+├── DatabaseError
+├── ValidationError
+├── CompressionError
+└── MonitorError
+
+Usage Example:
+─────────────
+try:
+    validate_license(license_key)
+except LicenseExpiredError as e:
+    log.error(f"License expired: {e}")
+    handle_expiry()
+except LicenseInvalidError as e:
+    log.error(f"Invalid license: {e}")
+    handle_invalid()
+except LicenseMachineMismatchError as e:
+    log.error(f"Machine mismatch: {e}")
+    handle_mismatch()
+```
+
+### Security Enhancements
+
+```
+Timing Attack Protection:
+─────────────────────────
+
+Before (Vulnerable):
+├── Password comparison with == operator
+├── Different response times for:
+│   ├── Wrong first character: ~1ms
+│   ├── Wrong last character: ~10ms
+│   └── Correct password: ~50ms
+└── Attacker can determine password character by character
+
+After (Secure):
+├── Uses werkzeug.security.check_password_hash
+├── Constant-time comparison
+├── Same response time regardless of:
+│   ├── How many characters match
+│   ├── Which characters match
+│   └── Whether password is correct
+└── Prevents timing-based attacks
+
+Code Change:
+────────────
+# Before (vulnerable)
+if password == stored_hash:
+    return True
+
+# After (secure)
+from werkzeug.security import check_password_hash
+if check_password_hash(stored_hash, password):
+    return True
+```
+
+### Testing Infrastructure
+
+```
+Test Structure:
+───────────────
+
+tests/
+├── __init__.py
+├── conftest.py              # Pytest configuration
+├── test_license_manager.py  # License tests
+└── test_validators.py       # Validator tests
+
+Running Tests:
+──────────────
+# Run all tests
+pytest
+
+# Run with verbose output
+pytest -v
+
+# Run specific test file
+pytest tests/test_license_manager.py
+
+# Run with coverage
+pytest --cov=shared --cov=server
+
+Test Fixtures:
+──────────────
+project_root_path    # Project root directory
+temp_dir            # Temporary directory
+temp_file           # Temporary file
+test_machine_id     # Test machine ID
+test_license_key    # Test license key
+mock_config         # Mock configuration
+
+Test Markers:
+─────────────
+@pytest.mark.screen_capture  # Screen capture tests
+@pytest.mark.audio          # Audio tests
+@pytest.mark.network        # Network tests
+@pytest.mark.slow           # Slow tests
+```
+
+### Docker Deployment
+
+```
+Docker Architecture:
+────────────────────
+
+docker-compose.yml
+├── server service
+│   ├── Build from server/Dockerfile
+│   ├── Port mapping: 5000:5000
+│   ├── Volume mounts:
+│   │   ├── ./server/data:/app/data
+│   │   ├── ./server/uploads:/app/uploads
+│   │   ├── ./server/licenses:/app/licenses
+│   │   └── ./server/keys:/app/keys
+│   └── Environment variables:
+│       ├── SECRET_KEY
+│       ├── ADMIN_PASSWORD
+│       └── DATABASE_URL
+└── nginx service (optional)
+    ├── Port mapping: 80:80, 443:443
+    └── Config: nginx.conf
+
+Dockerfile Features:
+────────────────────
+├── Multi-stage build
+├── Non-root user for security
+├── Health check endpoint
+├── Minimal image size
+└── Production-ready
+
+Docker Commands:
+────────────────
+# Build and start
+docker-compose up -d
+
+# View logs
+docker-compose logs -f server
+
+# Stop services
+docker-compose down
+
+# Restart
+docker-compose restart
+
+# Check status
+docker-compose ps
+
+# Rebuild after changes
+docker-compose up -d --build
+```
 
 ## File Locations Summary
 

@@ -188,6 +188,9 @@ echo   .\RAHUL          (local account, dot-backslash prefix)
 echo   Wings\RAHUL      (local account with computer name)
 echo   DOMAIN\RAHUL     (domain account)
 echo.
+echo NOTE: If your account has NO password, Windows blocks services from running.
+echo       The installer can automatically allow blank passwords for services.
+echo.
 
 :: Get username - use simple set /p without delayed expansion
 set SVC_USER=
@@ -208,9 +211,47 @@ goto :install_service
 echo Username: %SVC_USER%
 echo.
 echo If your account has NO password, just press Enter when asked for password.
+echo (The installer will automatically configure Windows to allow blank password)
+echo.
 set SVC_PASS=
 set /p SVC_PASS="Enter Windows password for %SVC_USER% (press Enter if no password): "
 echo.
+
+:: If blank password, configure Windows to allow blank passwords for network/service logon
+if "%SVC_PASS%"=="" (
+    echo.
+    echo Blank password detected. Configuring Windows to allow blank passwords...
+    echo This modifies: Accounts: Limit local account use of blank passwords to console logon only
+    echo.
+    
+    :: Disable the "Limit local account use of blank passwords to console logon only" policy
+    reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" /v "DisableAutomaticRestartSignOn" /t REG_DWORD /d 1 /f >nul 2>&1
+    
+    :: Main policy: Allow blank passwords for network/service logon
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v "LimitBlankPasswordUse" /t REG_DWORD /d 0 /f >nul 2>&1
+    
+    if %errorLevel%==0 (
+        echo SUCCESS: Windows policy updated to allow blank passwords for services.
+        echo.
+        echo Registry key modified:
+        echo HKLM\SYSTEM\CurrentControlSet\Control\Lsa\LimitBlankPasswordUse = 0
+        echo.
+    ) else (
+        echo WARNING: Failed to update Windows policy. You may need to do this manually:
+        echo.
+        echo Method 1 - Using Registry Editor:
+        echo   1. Open regedit
+        echo   2. Navigate to: HKLM\SYSTEM\CurrentControlSet\Control\Lsa
+        echo   3. Set LimitBlankPasswordUse to 0
+        echo.
+        echo Method 2 - Using Local Security Policy:
+        echo   1. Open secpol.msc
+        echo   2. Navigate to: Local Policies ^> Security Options
+        echo   3. Find "Accounts: Limit local account use of blank passwords..."
+        echo   4. Set to Disabled
+        echo.
+    )
+)
 pause
 goto :install_service
 

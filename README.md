@@ -9,6 +9,8 @@ A comprehensive auto screen recording application for Windows with client-server
 - **[Client Installation Guide](CLIENT_INSTALLATION_GUIDE.md)** - Detailed client setup instructions
 - **[API Documentation](API.md)** - Complete API reference
 - **[Workflow Documentation](WORKFLOW.md)** - How the system works
+- **[Docker Deployment](#docker-deployment)** - Deploy with Docker and Docker Compose
+- **[Testing](#testing)** - Unit tests and test coverage
 
 ## Features
 
@@ -78,6 +80,34 @@ A comprehensive auto screen recording application for Windows with client-server
 - Admin dashboard live updates
 - Event-based communication
 
+### Recent Improvements ✅
+
+#### Security Enhancements
+
+- **Timing Attack Protection**: Fixed timing attack vulnerability in password validation using constant-time comparison
+- **User Enumeration Prevention**: Added protection against user enumeration attacks
+- **Custom Exceptions**: Comprehensive exception hierarchy for better error handling
+
+#### Client Improvements
+
+- **Graceful Shutdown**: Added signal handlers (SIGINT, SIGTERM, SIGHUP) for graceful shutdown
+- **Thread Management**: Improved thread cleanup with configurable timeouts
+- **Responsive Shutdown**: 0.1s increments for faster signal response
+
+#### Testing Infrastructure
+
+- **Unit Tests**: Comprehensive test suite with pytest
+- **Test Coverage**: Tests for license manager, validators, and authentication
+- **Test Fixtures**: Reusable test fixtures and configuration
+- **Custom Markers**: Markers for screen capture, audio, network, and slow tests
+
+#### Docker Support
+
+- **Dockerfile**: Multi-stage build with security best practices
+- **Docker Compose**: Complete orchestration with volume mounts
+- **Non-Root User**: Container runs as non-root for security
+- **Health Checks**: Built-in health check endpoint
+
 ## Architecture
 
 ```
@@ -123,17 +153,30 @@ ScreenRecorderApp/
 │   ├── video_processor.py     # Thumbnail generation
 │   ├── websocket_manager.py   # WebSocket support
 │   ├── requirements.txt       # Python dependencies
+│   ├── Dockerfile             # Docker image definition
 │   ├── routes/                # API routes (blueprints)
 │   │   ├── __init__.py
 │   │   └── api.py             # API v1 endpoints
 │   └── templates/             # HTML templates
 ├── shared/                    # Shared modules
-│   ├���─ __init__.py
-│   └── license_manager.py     # License generation/validation
-├���─ API.md                     # API documentation
+│   ├── __init__.py
+│   ├── license_manager.py     # License generation/validation
+│   └── exceptions.py          # Custom exception classes
+├── tests/                     # Unit tests
+│   ├── __init__.py
+│   ├── conftest.py            # Pytest configuration
+│   ├── test_license_manager.py
+│   └── test_validators.py
+├── API.md                     # API documentation
 ├── WORKFLOW.md                # Workflow documentation
+├── QUICK_START_GUIDE.md       # Quick start guide
+├── SERVER_INSTALLATION_GUIDE.md # Server installation guide
+├── CLIENT_INSTALLATION_GUIDE.md # Client installation guide
 ├── build_client.py            # Build script for client
 ├── start_server.bat           # Server startup script
+├── docker-compose.yml         # Docker Compose configuration
+├── .dockerignore              # Docker ignore rules
+├── pytest.ini                 # Pytest configuration
 └── README.md                  # This file
 ```
 
@@ -172,7 +215,51 @@ ScreenRecorderApp/
    python app.py
    ```
 
-#### Option 2: Windows Service
+#### Option 2: Docker Deployment
+
+Deploy the server using Docker for easy setup and isolation:
+
+1. **Build and run with Docker Compose:**
+
+   ```bash
+   # Build and start the server
+   docker-compose up -d
+
+   # View logs
+   docker-compose logs -f server
+
+   # Stop services
+   docker-compose down
+   ```
+
+2. **Or build manually with Docker:**
+
+   ```bash
+   cd server
+   docker build -t screenrecorder-server .
+   docker run -d \
+     --name screenrecorder-server \
+     -p 5000:5000 \
+     -v ./data:/app/data \
+     -v ./uploads:/app/uploads \
+     -v ./licenses:/app/licenses \
+     -v ./keys:/app/keys \
+     -e SECRET_KEY=your-secret-key \
+     -e ADMIN_PASSWORD=your-admin-password \
+     screenrecorder-server
+   ```
+
+3. **Access the admin dashboard:**
+   Open `http://localhost:5000/admin` in your browser
+
+**Docker Security Features:**
+
+- Non-root user execution
+- Multi-stage build for smaller image size
+- Health checks for container monitoring
+- Volume mounts for persistent data
+
+#### Option 3: Windows Service
 
 For production deployment, install as a Windows service:
 

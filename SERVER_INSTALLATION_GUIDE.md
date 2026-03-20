@@ -10,6 +10,119 @@ Before starting, make sure you have:
 - Internet connection
 - Administrator access to your computer
 
+## Installation Methods
+
+You can install the server using either Docker (recommended for easy setup) or manual installation.
+
+---
+
+## Method 1: Docker Installation (Recommended)
+
+Docker provides an easy way to run the server without installing Python or managing dependencies.
+
+### Step 1: Install Docker
+
+1. **Download Docker Desktop:**
+   - Go to https://www.docker.com/products/docker-desktop/
+   - Click "Download for Windows"
+   - Run the installer
+   - Follow the installation wizard
+   - Restart your computer when prompted
+
+2. **Verify Docker is installed:**
+   - Open Command Prompt
+   - Type: `docker --version`
+   - You should see something like "Docker version 24.x.x"
+
+### Step 2: Download the Screen Recorder Server
+
+1. **Download the project:**
+   - Go to the project repository
+   - Click the green "Code" button
+   - Select "Download ZIP"
+   - Save the ZIP file to your Desktop
+
+2. **Extract the files:**
+   - Right-click the downloaded ZIP file
+   - Select "Extract All..."
+   - Click "Extract"
+   - You should see a folder named "ScreenRecorderApp" on your Desktop
+
+### Step 3: Start the Server with Docker
+
+1. **Open Command Prompt:**
+   - Press `Windows Key + R`
+   - Type `cmd` and press Enter
+
+2. **Navigate to the project folder:**
+
+   ```bash
+   cd Desktop\ScreenRecorderApp
+   ```
+
+3. **Start the server:**
+
+   ```bash
+   docker-compose up -d
+   ```
+
+4. **Wait for setup to complete:**
+   - First time may take 2-3 minutes to download images
+   - You'll see messages about downloading and starting containers
+
+### Step 4: Configure the Server
+
+1. **Create environment file:**
+
+   ```bash
+   cd server
+   copy .env.example .env
+   ```
+
+2. **Edit the configuration:**
+   - Open `.env` file in Notepad
+   - Change `SECRET_KEY` to a random string (at least 32 characters)
+   - Change `ADMIN_PASSWORD` to a strong password (at least 12 characters)
+   - Save the file
+
+3. **Restart the server:**
+   ```bash
+   cd ..
+   docker-compose restart
+   ```
+
+### Step 5: Access the Admin Dashboard
+
+1. Open your web browser
+2. Go to: http://localhost:5000/admin
+3. Enter the password you set in Step 4
+4. Click "Login"
+
+**Docker Management Commands:**
+
+```bash
+# Start the server
+docker-compose up -d
+
+# Stop the server
+docker-compose down
+
+# View logs
+docker-compose logs -f server
+
+# Restart the server
+docker-compose restart
+
+# Check status
+docker-compose ps
+```
+
+---
+
+## Method 2: Manual Installation
+
+If you prefer not to use Docker, follow these steps:
+
 ## Step 1: Install Python
 
 1. **Download Python:**
@@ -116,21 +229,56 @@ Before starting, make sure you have:
 
 ## Troubleshooting
 
-### Problem: "Python is not recognized"
+### Docker Issues
+
+#### Problem: "docker: command not found"
+
+**Solution:**
+
+- Make sure Docker Desktop is installed and running
+- Restart your computer after installing Docker
+- Check if Docker Desktop is running in your system tray
+
+#### Problem: "Cannot connect to the Docker daemon"
+
+**Solution:**
+
+- Open Docker Desktop and wait for it to start
+- Check if Docker Desktop shows "Docker Desktop is running"
+
+#### Problem: Port 5000 already in use
+
+**Solution:**
+
+- Stop any existing server: `docker-compose down`
+- Or change the port in `docker-compose.yml` (e.g., change "5000:5000" to "5001:5000")
+- Then access via http://localhost:5001/admin
+
+#### Problem: Container keeps restarting
+
+**Solution:**
+
+- Check logs: `docker-compose logs -f server`
+- Make sure `.env` file exists and has correct values
+- Check if volumes have correct permissions
+
+### Manual Installation Issues
+
+#### Problem: "Python is not recognized"
 
 **Solution:**
 
 - Restart your computer
 - If still not working, reinstall Python and make sure to check "Add Python to PATH"
 
-### Problem: "Access denied" when running install script
+#### Problem: "Access denied" when running install script
 
 **Solution:**
 
 - Make sure you right-click and select "Run as administrator"
 - If still not working, temporarily disable antivirus
 
-### Problem: Server won't start
+#### Problem: Server won't start
 
 **Solution:**
 
@@ -141,7 +289,7 @@ Before starting, make sure you have:
   ```
 - If you see a process using port 5000, stop it or change the port in `.env` file
 
-### Problem: Can't access admin dashboard
+#### Problem: Can't access admin dashboard
 
 **Solution:**
 
@@ -151,33 +299,41 @@ Before starting, make sure you have:
 
 ## Managing the Server
 
-### Start the server:
+### Docker Management
+
+```bash
+# Start the server
+docker-compose up -d
+
+# Stop the server
+docker-compose down
+
+# View logs
+docker-compose logs -f server
+
+# Restart the server
+docker-compose restart
+
+# Check status
+docker-compose ps
+```
+
+### Windows Service Management
 
 ```batch
+# Start the server
 sc start ScreenRecorderServer
-```
 
-### Stop the server:
-
-```batch
+# Stop the server
 sc stop ScreenRecorderServer
-```
 
-### Check server status:
-
-```batch
+# Check server status
 sc query ScreenRecorderServer
-```
 
-### View server logs:
-
-```batch
+# View server logs
 type "C:\Program Files\ScreenRecorderServer\logs\service.log"
-```
 
-### Uninstall the server:
-
-```batch
+# Uninstall the server
 uninstall_server_service.bat
 ```
 

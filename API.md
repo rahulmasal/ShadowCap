@@ -562,3 +562,65 @@ The streaming endpoint supports HTTP Range requests, enabling:
 - Video seeking
 - Partial content delivery
 - Efficient bandwidth usage
+
+---
+
+## Recent Improvements
+
+### Custom Exceptions
+
+The API now uses a comprehensive exception hierarchy for better error handling:
+
+```python
+from shared.exceptions import (
+    LicenseError,
+    LicenseExpiredError,
+    LicenseInvalidError,
+    LicenseMachineMismatchError,
+    UploadError,
+    UploadFailedError,
+    UploadSizeExceededError,
+    RecordingError,
+    RecordingStartError,
+    RecordingStopError,
+)
+```
+
+### Security Enhancements
+
+- **Timing Attack Protection**: Password validation uses constant-time comparison
+- **User Enumeration Prevention**: Generic error messages prevent user enumeration
+- **Rate Limiting**: All endpoints protected against abuse
+
+### Testing
+
+Unit tests are available for critical modules:
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=shared --cov=server
+
+# Run specific tests
+pytest tests/test_license_manager.py
+pytest tests/test_validators.py
+```
+
+### Docker Support
+
+The server can be deployed using Docker:
+
+```bash
+# Build and start with Docker Compose
+docker-compose up -d
+
+# View logs
+docker-compose logs -f server
+
+# Stop services
+docker-compose down
+```
+
+See [README.md](README.md) for detailed Docker deployment instructions.

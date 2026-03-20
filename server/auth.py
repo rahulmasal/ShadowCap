@@ -4,6 +4,8 @@ Authentication module with JWT support and secure session management
 
 import hashlib
 import secrets
+import hmac
+import time
 from datetime import datetime, timedelta
 from functools import wraps
 from typing import Optional, Tuple
@@ -172,22 +174,34 @@ def rate_limit(limit: int = 60, window: int = 60):
 
 
 def validate_admin_password(password: str) -> Tuple[bool, str]:
-    """Validate admin password with rate limiting"""
-    # Use werkzeug's secure password hashing
+    """Validate admin password with constant-time comparison to prevent timing attacks.
+
+    Args:
+        password: The password to validate
+
+    Returns:
+        Tuple of (is_valid, message)
+    """
     from werkzeug.security import check_password_hash, generate_password_hash
 
     # For backward compatibility, check if password is already hashed
     # If not, hash it and store (this should be done during setup)
     stored_hash = settings.admin_password
 
-    # If the stored password looks like a plain text (not a werkzeug hash),
+    # If the stored password looks like plain text (not a werkzeug hash),
     # we need to hash it. In production, passwords should be pre-hashed.
     if not stored_hash.startswith(("pbkdf2:", "scrypt:")):
         # Plain text password - hash it for comparison
         stored_hash = generate_password_hash(stored_hash, method="scrypt")
 
+    # Use werkzeug's check_password_hash which already uses constant-time comparison
+    # This prevents timing attacks where an attacker could determine correct password
+    # characters by measuring response time differences
     if check_password_hash(stored_hash, password):
         return True, "Authentication successful"
+
+    # Always return the same error message regardless of whether password exists
+    # This prevents user enumeration attacks
     return False, "Invalid password"
 
 

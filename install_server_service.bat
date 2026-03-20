@@ -1,4 +1,16 @@
 @echo off
+
+:: ---------------------------------------------------------------
+:: Re-launch inside a persistent cmd window so the console does
+:: NOT close automatically when the script finishes or errors out.
+:: The _KEEP_OPEN flag prevents infinite re-launch loops.
+:: ---------------------------------------------------------------
+if not defined _KEEP_OPEN (
+    set _KEEP_OPEN=1
+    cmd /k ""%~f0""
+    exit /b
+)
+
 echo ================================================
 echo   Screen Recorder Server - Windows Service Installer
 echo ================================================
@@ -18,25 +30,17 @@ set INSTALL_DIR=C:\ScreenRecorderServer
 set SCRIPT_DIR=%~dp0
 set SERVER_DIR=%SCRIPT_DIR%server
 set SHARED_DIR=%SCRIPT_DIR%shared
+set NSSM=%SCRIPT_DIR%nssm.exe
 
 echo Step 1: Creating installation directory...
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 if not exist "%INSTALL_DIR%\logs" mkdir "%INSTALL_DIR%\logs"
+if not exist "%INSTALL_DIR%\uploads" mkdir "%INSTALL_DIR%\uploads"
+if not exist "%INSTALL_DIR%\clients" mkdir "%INSTALL_DIR%\clients"
+if not exist "%INSTALL_DIR%\keys" mkdir "%INSTALL_DIR%\keys"
+if not exist "%INSTALL_DIR%\licenses" mkdir "%INSTALL_DIR%\licenses"
+if not exist "%INSTALL_DIR%\instance" mkdir "%INSTALL_DIR%\instance"
 echo Done.
-pause
-
-echo Step 1b: Copying nssm.exe to installation directory...
-if exist "%NSSM%" (
-    copy /Y "%NSSM%" "%INSTALL_DIR%\nssm.exe"
-    echo nssm.exe copied to %INSTALL_DIR%
-) else (
-    echo ERROR: nssm.exe not found at %SCRIPT_DIR%nssm.exe
-    echo Please place nssm.exe in the same folder as this installer and re-run.
-    pause
-    exit /b 1
-)
-set NSSM=%INSTALL_DIR%\nssm.exe
-echo NSSM will run from: %NSSM%
 pause
 
 echo Step 2: Copying server files...
@@ -56,8 +60,7 @@ if not exist "%INSTALL_DIR%\venv" (
 pause
 
 echo Step 4: Installing dependencies...
-call "%INSTALL_DIR%\venv\Scripts\activate.bat"
-pip install -r "%INSTALL_DIR%\requirements.txt"
+"%INSTALL_DIR%\venv\Scripts\pip.exe" install -r "%INSTALL_DIR%\requirements.txt"
 echo Done.
 pause
 
@@ -73,8 +76,8 @@ pause
 
 echo Step 6: Downloading NSSM...
 if not exist "%NSSM%" (
-    echo Downloading NSSM from https://nssm.cc/release/nssm-2.24.zip...
-    curl -L -o "%SCRIPT_DIR%nssm.zip" https://nssm.cc/release/nssm-2.24.zip
+    echo NSSM not found. Attempting to download...
+    curl -L --max-time 30 -o "%SCRIPT_DIR%nssm.zip" https://nssm.cc/release/nssm-2.24.zip
     if not exist "%SCRIPT_DIR%nssm.zip" (
         echo ERROR: Failed to download NSSM.
         echo.
@@ -88,8 +91,7 @@ if not exist "%NSSM%" (
         exit /b 1
     )
     echo Extracting NSSM...
-    cd /d "%SCRIPT_DIR%"
-    tar -xf nssm.zip
+    tar -xf "%SCRIPT_DIR%nssm.zip" -C "%SCRIPT_DIR%"
     if not exist "%SCRIPT_DIR%nssm-2.24\win64\nssm.exe" (
         echo ERROR: Failed to extract NSSM properly.
         echo.
@@ -99,20 +101,72 @@ if not exist "%NSSM%" (
         echo 3. Extract nssm.exe from the win64 folder
         echo 4. Place nssm.exe in: %SCRIPT_DIR%
         echo 5. Run this script again
+        if exist "%SCRIPT_DIR%nssm.zip" del "%SCRIPT_DIR%nssm.zip"
         pause
         exit /b 1
     )
-    copy "%SCRIPT_DIR%nssm-2.24\win64\nssm.exe" "%NSSM%"
+    copy "%SCRIPT_DIR%nssm-2.24\win64\nssm.exe" "%SCRIPT_DIR%nssm.exe"
     rmdir /s /q "%SCRIPT_DIR%nssm-2.24"
     del "%SCRIPT_DIR%nssm.zip"
-    echo NSSM downloaded successfully.
+    echo NSSM downloaded and extracted successfully.
 ) else (
-    echo NSSM already exists.
+    echo NSSM already exists, skipping download.
 )
+
+echo Copying nssm.exe to installation directory...
+copy /Y "%SCRIPT_DIR%nssm.exe" "%INSTALL_DIR%\nssm.exe"
+set NSSM=%INSTALL_DIR%\nssm.exe
+echo NSSM will run from: %NSSM%
 pause
 
-echo Step 7: Installing Windows service...
+echo Step 7: Removing any existing service before installing...
+echo Stopping existing service (errors are normal if service does not exist)...
+"%NSSM%" stop ScreenRecorderServer
+timeout /t 2 /nobreak >nul
+echo Removing existing service (errors are normal if service does not exist)...
+"%NSSM%" remove ScreenRecorderServer confirm
+timeout /t 3 /nobreak >nul
+
+echo Ensuring directories exist and granting write permissions to all users...
+if not exist "%INSTALL_DIR%\logs" mkdir "%INSTALL_DIR%\logs"
+icacls "%INSTALL_DIR%\logs" /grant "Users:(OI)(CI)F" /T >nul 2>&1
+if not exist "%INSTALL_DIR%\uploads" mkdir "%INSTALL_DIR%\uploads"
+icacls "%INSTALL_DIR%\uploads" /grant "Users:(OI)(CI)F" /T >nul 2>&1
+if not exist "%INSTALL_DIR%\clients" mkdir "%INSTALL_DIR%\clients"
+icacls "%INSTALL_DIR%\clients" /grant "Users:(OI)(CI)F" /T >nul 2>&1
+if not exist "%INSTALL_DIR%\keys" mkdir "%INSTALL_DIR%\keys"
+icacls "%INSTALL_DIR%\keys" /grant "Users:(OI)(CI)F" /T >nul 2>&1
+if not exist "%INSTALL_DIR%\licenses" mkdir "%INSTALL_DIR%\licenses"
+icacls "%INSTALL_DIR%\licenses" /grant "Users:(OI)(CI)F" /T >nul 2>&1
+if not exist "%INSTALL_DIR%\instance" mkdir "%INSTALL_DIR%\instance"
+icacls "%INSTALL_DIR%\instance" /grant "Users:(OI)(CI)F" /T >nul 2>&1
+
+echo Creating empty log files if they don't exist...
+if not exist "%INSTALL_DIR%\logs\server.log" type nul > "%INSTALL_DIR%\logs\server.log"
+if not exist "%INSTALL_DIR%\logs\crash.log" type nul > "%INSTALL_DIR%\logs\crash.log"
+icacls "%INSTALL_DIR%\logs\server.log" /grant "Users:(OI)(CI)F" >nul 2>&1
+icacls "%INSTALL_DIR%\logs\crash.log" /grant "Users:(OI)(CI)F" >nul 2>&1
+echo Step 7 complete.
+pause
+
+echo Step 8: Installing Windows service...
+echo NSSM path used: %NSSM%
+echo Python path:   %INSTALL_DIR%\venv\Scripts\python.exe
+echo Script path:   %INSTALL_DIR%\app.py
+echo.
+
+echo Installing NSSM service...
 "%NSSM%" install ScreenRecorderServer "%INSTALL_DIR%\venv\Scripts\python.exe" "%INSTALL_DIR%\app.py"
+if errorlevel 1 (
+    echo ERROR: NSSM install failed.
+    echo Make sure nssm.exe is present at: %NSSM%
+    echo Make sure you are running this script as Administrator.
+    pause
+    exit /b 1
+)
+echo NSSM service registered OK.
+
+echo Configuring service settings...
 "%NSSM%" set ScreenRecorderServer AppDirectory "%INSTALL_DIR%"
 "%NSSM%" set ScreenRecorderServer DisplayName "Screen Recorder Server"
 "%NSSM%" set ScreenRecorderServer Description "Screen Recorder Server Application"
@@ -123,10 +177,13 @@ echo Step 7: Installing Windows service...
 "%NSSM%" set ScreenRecorderServer AppRotateOnline 1
 "%NSSM%" set ScreenRecorderServer AppRotateSeconds 86400
 "%NSSM%" set ScreenRecorderServer AppRotateBytes 1048576
-echo Service installed.
+"%NSSM%" set ScreenRecorderServer AppExit Default Restart
+"%NSSM%" set ScreenRecorderServer AppExit 0 Exit
+echo Service settings applied.
+echo Step 8 complete - Service installed.
 pause
 
-echo Step 8: Starting service...
+echo Step 9: Starting service...
 "%NSSM%" start ScreenRecorderServer
 if %errorLevel% neq 0 (
     echo ERROR: Failed to start service. Error code: %errorLevel%
@@ -144,7 +201,12 @@ echo ================================================
 echo.
 echo Service Name: ScreenRecorderServer
 echo Installation Directory: %INSTALL_DIR%
-echo Logs Directory: %INSTALL_DIR%\logs
+echo.
+echo Log Files:
+echo   - Service stdout: %INSTALL_DIR%\logs\service.log
+echo   - Service stderr: %INSTALL_DIR%\logs\service_error.log
+echo   - Server log:     %INSTALL_DIR%\logs\server.log
+echo   - Crash log:      %INSTALL_DIR%\logs\crash.log
 echo.
 echo The server will start automatically on system boot.
 echo.
@@ -155,6 +217,11 @@ echo   - Start:   sc start ScreenRecorderServer
 echo   - Stop:    sc stop ScreenRecorderServer
 echo   - Status:  sc query ScreenRecorderServer
 echo.
+echo To view logs:
+echo   - type "%INSTALL_DIR%\logs\service.log"
+echo   - type "%INSTALL_DIR%\logs\server.log"
+echo.
 echo To uninstall, run: uninstall_server_service.bat
 echo ================================================
+echo.
 pause
