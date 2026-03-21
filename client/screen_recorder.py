@@ -822,11 +822,19 @@ class ScreenRecorder:
             else:
                 logger.error(
                     "[START] Could not relaunch in user session. "
-                    "Falling back to recording from Session 0 (frames may be black). "
-                    "Consider configuring the service to 'Log On As' the target user account "
-                    "via Services.msc or the installer."
+                    "The service is running as LocalSystem in Session 0 and cannot access "
+                    "the interactive desktop. Screen capture is not possible from this context. "
+                    "FIX: Configure the service to 'Log On As' the target user account "
+                    "via Services.msc (Properties -> Log On tab), or re-run the installer "
+                    "with a user account. Alternatively, grant the LocalSystem account "
+                    "the 'Act as part of the operating system' (SeTcbPrivilege) privilege "
+                    "via secpol.msc -> Local Policies -> User Rights Assignment."
                 )
-                # Fall through and attempt capture anyway so the service doesn't silently fail
+                # Enter PAUSED state so the service stays alive (Windows won't report
+                # it as failed) without wasting disk writing all-black video files.
+                # The user must reconfigure the service logon account to fix this.
+                self.state = ClientState.PAUSED
+                return True
 
         self._stop_event.clear()
         self.state = ClientState.RECORDING

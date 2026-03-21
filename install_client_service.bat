@@ -308,6 +308,41 @@ if "%SVC_USER%"=="LocalSystem" goto :skip_logon_config
     echo but for reliable capture it is strongly recommended to run the service
     echo as the target user account ^(re-run this installer and enter credentials^).
     echo.
+    echo Attempting to grant LocalSystem the 'Act as part of the operating system'
+    echo privilege ^(SeTcbPrivilege^) so it can relaunch in the user session...
+    echo.
+    :: Export current security policy, add SeTcbPrivilege for *S-1-5-18 (LocalSystem),
+    :: then re-import it.
+    set _SECEDIT_DB=%TEMP%\screensvc_secedit.db
+    set _SECEDIT_INF=%TEMP%\screensvc_tcb.inf
+    (
+        echo [Unicode]
+        echo Unicode=yes
+        echo [Version]
+        echo signature="$CHICAGO$"
+        echo Revision=1
+        echo [Privilege Rights]
+        echo SeTcbPrivilege = *S-1-5-18
+    ) > "%_SECEDIT_INF%"
+    secedit /configure /db "%_SECEDIT_DB%" /cfg "%_SECEDIT_INF%" /areas USER_RIGHTS /quiet
+    if %errorLevel%==0 (
+        echo SUCCESS: SeTcbPrivilege granted to LocalSystem.
+        echo The service can now relaunch the recorder in the active user session.
+    ) else (
+        echo WARNING: Could not automatically grant SeTcbPrivilege.
+        echo To grant it manually:
+        echo   1. Open secpol.msc
+        echo   2. Navigate to: Local Policies ^> User Rights Assignment
+        echo   3. Open "Act as part of the operating system"
+        echo   4. Add "LOCAL SERVICE" or "NT AUTHORITY\SYSTEM"
+        echo   5. Restart the service.
+        echo.
+        echo Alternatively, re-run this installer and enter your Windows user
+        echo credentials to run the service as your own account instead.
+    )
+    if exist "%_SECEDIT_INF%" del "%_SECEDIT_INF%" >nul 2>&1
+    if exist "%_SECEDIT_DB%" del "%_SECEDIT_DB%" >nul 2>&1
+    echo.
 :logon_config_done
 echo Step 9 complete - Service installed.
 pause

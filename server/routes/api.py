@@ -339,29 +339,42 @@ def heartbeat():
     try:
         machine_id = g.machine_id
 
+        # machine_id is required — reject early with a clear error instead of
+        # letting a None value propagate into the database and cause a 500.
+        if not machine_id:
+            logger.warning("[HEARTBEAT] Received heartbeat with no machine_id")
+            return jsonify({"error": "machine_id is required"}), 400
+
         # Get or create client
         client = db.session.execute(
             db.select(Client).where(Client.machine_id == machine_id)
         ).scalar_one_or_none()
 
+        now = datetime.utcnow()
         if client is None:
             client = Client(machine_id=machine_id)
-            client.last_seen = datetime.utcnow()
+            client.last_seen = now
             client.is_active = True
             db.session.add(client)
+            db.session.flush()  # Flush to get client.id before commit
         else:
-            client.last_seen = datetime.utcnow()
+            client.last_seen = now
             client.is_active = True
 
         db.session.commit()
 
-        # Log heartbeat so it appears on the connection logs page
-        log_audit(
-            action="heartbeat",
-            entity_type="client",
-            entity_id=client.id,
-            details={"machine_id": machine_id},
-        )
+        # Log heartbeat so it appears on the connection logs page.
+        # Use a separate try/except so an audit-log failure never causes a
+        # heartbeat 500 — the heartbeat itself was already committed above.
+        try:
+            log_audit(
+                action="heartbeat",
+                entity_type="client",
+                entity_id=client.id,
+                details={"machine_id": machine_id},
+            )
+        except Exception as audit_err:
+            logger.warning(f"[HEARTBEAT] Audit log failed (non-fatal): {audit_err}")
 
         return jsonify(
             {
@@ -374,7 +387,7 @@ def heartbeat():
     except Exception as e:
         logger.error(f"Heartbeat error: {e}", exc_info=True)
         db.session.rollback()
-        return jsonify({"error": "Internal server error"}), 500
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
 
 @api_bp.route("/get-machine-id", methods=["GET"])
