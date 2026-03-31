@@ -58,7 +58,7 @@ If you don't have Docker, follow these steps:
 ### Step 4: Set Your Password
 
 1. Press `Windows Key + R`
-2. Type: `notepad "C:\Program Files\ScreenRecorderServer\.env"`
+2. Type: `notepad "C:\ScreenRecorderServer\.env"`
 3. Press Enter
 4. Find the line: `ADMIN_PASSWORD=your-secure-admin-password-min-12-chars`
 5. Change it to your password (at least 12 characters)
@@ -147,7 +147,7 @@ If you don't have Docker, follow these steps:
 
 ### From Server Computer:
 
-Videos are stored in: `C:\Program Files\ScreenRecorderServer\uploads\{machine-id}\`
+Videos are stored in: `C:\ScreenRecorderServer\uploads\{machine-id}\`
 
 ---
 
@@ -217,7 +217,7 @@ sc stop ScreenRecorderServer
 sc query ScreenRecorderServer
 
 # View logs
-type "C:\Program Files\ScreenRecorderServer\logs\service.log"
+type "C:\ScreenRecorderServer\logs\service.log"
 ```
 
 ### Client Commands:

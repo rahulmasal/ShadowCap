@@ -23,6 +23,13 @@ X-License-Key: <your-license-key>
 X-Machine-ID: <your-machine-id>
 ```
 
+Or alternatively:
+
+```
+X-License-Token: <your-license-key>
+X-Machine-ID: <your-machine-id>
+```
+
 **Form Data:**
 
 ```
@@ -64,10 +71,13 @@ Upload a recorded video to the server.
 
 **Headers:**
 
-| Header        | Required | Description       |
-| ------------- | -------- | ----------------- |
-| X-License-Key | Yes      | Valid license key |
-| X-Machine-ID  | Yes      | Client machine ID |
+| Header          | Required | Description                    |
+| --------------- | -------- | ------------------------------ |
+| X-License-Key   | Yes\*    | Valid license key              |
+| X-License-Token | Yes\*    | Alternative license key header |
+| X-Machine-ID    | Yes      | Client machine ID              |
+
+\*Either X-License-Key or X-License-Token is required
 
 **Form Data:**
 
@@ -153,10 +163,13 @@ Send a heartbeat to indicate client is active.
 
 **Headers:**
 
-| Header        | Required | Description       |
-| ------------- | -------- | ----------------- |
-| X-License-Key | Yes      | Valid license key |
-| X-Machine-ID  | Yes      | Client machine ID |
+| Header          | Required | Description                    |
+| --------------- | -------- | ------------------------------ |
+| X-License-Key   | Yes\*    | Valid license key              |
+| X-License-Token | Yes\*    | Alternative license key header |
+| X-Machine-ID    | Yes      | Client machine ID              |
+
+\*Either X-License-Key or X-License-Token is required
 
 **Response:**
 

@@ -18,7 +18,13 @@ set INSTALL_DIR=C:\ScreenRecorderClient
 set SCRIPT_DIR=%~dp0
 
 echo Step 1: Stopping service...
-"%SCRIPT_DIR%nssm.exe" stop ScreenRecSvc
+if exist "%INSTALL_DIR%\nssm.exe" (
+    "%INSTALL_DIR%\nssm.exe" stop ScreenRecSvc
+) else if exist "%SCRIPT_DIR%nssm.exe" (
+    "%SCRIPT_DIR%nssm.exe" stop ScreenRecSvc
+) else (
+    sc stop ScreenRecSvc
+)
 if %errorLevel% neq 0 (
     echo WARNING: Failed to stop service. Error code: %errorLevel%
     echo The service might not be running.
@@ -28,9 +34,15 @@ if %errorLevel% neq 0 (
 pause
 
 echo Step 2: Removing Windows service...
-"%SCRIPT_DIR%nssm.exe" remove ScreenRecSvc confirm
+if exist "%INSTALL_DIR%\nssm.exe" (
+    "%INSTALL_DIR%\nssm.exe" remove ScreenRecSvc confirm
+) else if exist "%SCRIPT_DIR%nssm.exe" (
+    "%SCRIPT_DIR%nssm.exe" remove ScreenRecSvc confirm
+) else (
+    sc delete ScreenRecSvc
+)
 if %errorLevel% neq 0 (
-    echo WARNING: Failed to remove service via NSSM. Error code: %errorLevel%
+    echo WARNING: Failed to remove service. Error code: %errorLevel%
     echo Trying alternative method...
     sc delete ScreenRecSvc
     if %errorLevel% neq 0 (
@@ -40,7 +52,7 @@ if %errorLevel% neq 0 (
         echo Service removed successfully via sc.
     )
 ) else (
-    echo Service removed successfully via NSSM.
+    echo Service removed successfully.
 )
 pause
 

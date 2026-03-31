@@ -24,7 +24,9 @@ timeout /t 3 /nobreak >nul
 
 :: Remove service
 echo Removing Windows service...
-if exist "%SCRIPT_DIR%nssm.exe" (
+if exist "%INSTALL_DIR%\nssm.exe" (
+    "%INSTALL_DIR%\nssm.exe" remove ScreenRecorderServer confirm
+) else if exist "%SCRIPT_DIR%nssm.exe" (
     "%SCRIPT_DIR%nssm.exe" remove ScreenRecorderServer confirm
 ) else (
     sc delete ScreenRecorderServer

@@ -23,13 +23,19 @@ Before starting, make sure you have:
    cd Desktop\ScreenRecorderApp\client
    ```
 
-3. **Get your machine ID:**
+3. **Install dependencies (first time only):**
+
+   ```batch
+   pip install -r requirements.txt
+   ```
+
+4. **Get your machine ID:**
 
    ```batch
    python screen_recorder.py --get-id
    ```
 
-4. **Copy the machine ID:**
+5. **Copy the machine ID:**
    - You'll see output like: `Your Machine ID: a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6`
    - Write down or copy this ID (you'll need it for the next step)
 
@@ -62,32 +68,39 @@ Before starting, make sure you have:
 1. **Build the client executable:**
    - On the server computer, navigate to the ScreenRecorderApp folder
    - Run: `python build_client.py`
-   - The executable will be created in the `dist` folder
+   - The executable and files will be created in the `dist` folder
 
 2. **Copy files to client computer:**
-   - Copy `ScreenRecorderClient.exe` from `dist` folder
-   - Copy `install_client_service.bat` from the client folder
-   - Copy `public_key.pem` from `server/keys/` folder
+   - Copy all files from `dist` folder to a USB drive or network share
+   - Required files:
+     - `ScreenRecorderClient.exe` (or `client\` folder with all files)
+     - `install_client_service.bat`
+     - `public_key.pem` (from `server/keys/` folder on server)
 
 3. **Prepare the installation:**
    - Create a new folder: `C:\ScreenRecorderClient`
-   - Copy the executable to this folder
-   - Create a new file named `license.key` in this folder
+   - Copy all client files to this folder (screen_recorder.py, requirements.txt, shared/, etc.)
+   - Copy `public_key.pem` to `C:\ScreenRecorderClient\`
+   - Create a new file named `license.key` in `C:\ScreenRecorderClient\`
    - Paste the license key from Step 2 into this file
    - Save the file
-   - Copy `public_key.pem` to this folder
 
 4. **Run the installation script:**
    - Right-click on `install_client_service.bat`
    - Select "Run as administrator"
    - If prompted by Windows, click "Yes" to allow
+   - Enter the server IP address when prompted
+   - Enter your Windows username and password when prompted (so the service can capture the screen)
    - Wait for installation to complete
 
 5. **What happens during installation:**
-   - The client is installed to `C:\ScreenRecorderClient`
-   - A Windows service is created (Service Name: ScreenRecSvc)
-   - The service starts automatically
-   - Recording begins immediately
+   - Creates virtual environment at `C:\ScreenRecorderClient\venv`
+   - Installs Python dependencies
+   - Creates config.json at `C:\ScreenRecorderClient\ScreenRecSvc\config.json`
+   - Copies license.key and public_key.pem to installation directory
+   - Installs Windows service (ScreenRecSvc) using NSSM
+   - Configures service to run under your user account (required for screen capture)
+   - Starts the service automatically
 
 ### Option B: Running Python Script Directly
 
@@ -156,9 +169,8 @@ If you prefer to run the client as a Python script:
 
 1. **Edit the configuration file:**
    - Press `Windows Key + R`
-
-- Type: `notepad "C:\ScreenRecorderClient\config.json"`
-- Press Enter
+   - Type: `notepad "C:\ScreenRecorderClient\ScreenRecSvc\config.json"`
+   - Press Enter
 
 2. **Available settings:**
 

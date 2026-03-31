@@ -171,7 +171,7 @@ If you prefer not to use Docker, follow these steps:
    - Wait for the installation to complete (this may take a few minutes)
 
 3. **What happens during installation:**
-   - The server files are copied to `C:\Program Files\ScreenRecorderServer`
+   - The server files are copied to `C:\ScreenRecorderServer`
    - A virtual environment is created
    - Required packages are installed
    - A Windows service is created
@@ -181,7 +181,7 @@ If you prefer not to use Docker, follow these steps:
 
 1. **Open the configuration file:**
    - Press `Windows Key + R`
-   - Type: `notepad "C:\Program Files\ScreenRecorderServer\.env"`
+   - Type: `notepad "C:\ScreenRecorderServer\.env"`
    - Press Enter
 
 2. **Edit the configuration:**
@@ -294,7 +294,7 @@ If you prefer not to use Docker, follow these steps:
 **Solution:**
 
 - Make sure the server is running: `sc query ScreenRecorderServer`
-- Check the logs: `type "C:\Program Files\ScreenRecorderServer\logs\service.log"`
+- Check the logs: `type "C:\ScreenRecorderServer\logs\service.log"`
 - Try accessing: http://127.0.0.1:5000/admin instead
 
 ## Managing the Server
@@ -331,7 +331,7 @@ sc stop ScreenRecorderServer
 sc query ScreenRecorderServer
 
 # View server logs
-type "C:\Program Files\ScreenRecorderServer\logs\service.log"
+type "C:\ScreenRecorderServer\logs\service.log"
 
 # Uninstall the server
 uninstall_server_service.bat

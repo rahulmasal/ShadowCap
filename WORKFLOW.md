@@ -650,33 +650,41 @@ docker-compose up -d --build
 
 ### Client PC
 
-| File/Folder              | Location                               | Purpose              |
-| ------------------------ | -------------------------------------- | -------------------- |
-| ScreenRecorderClient.exe | C:\Program Files\ScreenRecSvc\         | Main executable      |
-| license.key              | C:\Program Files\ScreenRecSvc\         | License file         |
-| config.json              | C:\Program Files\ScreenRecSvc\         | Configuration        |
-| Recordings (temp)        | %APPDATA%\ScreenRecSvc\recordings\     | Local video storage  |
-| Offline Queue            | %APPDATA%\ScreenRecSvc\offline_queue\  | Pending uploads      |
-| Thumbnails               | %APPDATA%\ScreenRecSvc\thumbnails\     | Generated thumbnails |
-| Logs                     | %APPDATA%\ScreenRecSvc\service.log     | Debug logs           |
+| File/Folder        | Location                                             | Purpose                   |
+| ------------------ | ---------------------------------------------------- | ------------------------- |
+| screen_recorder.py | C:\ScreenRecorderClient\                             | Main client script        |
+| license.key        | C:\ScreenRecorderClient\                             | License file              |
+| public_key.pem     | C:\ScreenRecorderClient\                             | Public key for validation |
+| config.json        | C:\ScreenRecorderClient\ScreenRecSvc\                | Configuration             |
+| Recordings (temp)  | C:\ScreenRecorderClient\ScreenRecSvc\recordings\     | Local video storage       |
+| Offline Queue      | C:\ScreenRecorderClient\ScreenRecSvc\offline_queue\  | Pending uploads           |
+| Thumbnails         | C:\ScreenRecorderClient\ScreenRecSvc\thumbnails\     | Generated thumbnails      |
+| Client log         | C:\ScreenRecorderClient\ScreenRecSvc\client.log      | Debug logs                |
+| Crash log          | C:\ScreenRecorderClient\ScreenRecSvc\crash.log       | Crash logs                |
+| Service stdout     | C:\ScreenRecorderClient\logs\service.log             | Service output            |
+| Service stderr     | C:\ScreenRecorderClient\logs\service_error.log       | Service errors            |
 
 ### Server PC
 
-| File/Folder          | Location                     | Purpose                       |
-| -------------------- | ---------------------------- | ----------------------------- |
-| app.py               | server/                      | Main server script            |
-| config.py            | server/                      | Configuration management      |
-| models.py            | server/                      | Database models               |
-| auth.py              | server/                      | Authentication & CSRF         |
-| validators.py        | server/                      | Input validation              |
-| video_processor.py   | server/                      | Thumbnail generation          |
-| websocket_manager.py | server/                      | WebSocket support             |
-| routes/api.py        | server/routes/               | API endpoints                 |
-| private_key.pem      | server/keys/                 | License signing key (SECRET!) |
-| public_key.pem       | server/keys/                 | License validation key        |
-| screenrecorder.db    | server/data/                 | SQLite database               |
-| Uploaded Videos      | server/uploads/{machine_id}/ | Video storage                 |
-| Thumbnails           | server/uploads/thumbnails/   | Video thumbnails              |
+| File/Folder          | Location                                       | Purpose                       |
+| -------------------- | ---------------------------------------------- | ----------------------------- |
+| app.py               | C:\ScreenRecorderServer\                       | Main server script            |
+| config.py            | C:\ScreenRecorderServer\                       | Configuration management      |
+| models.py            | C:\ScreenRecorderServer\                       | Database models               |
+| auth.py              | C:\ScreenRecorderServer\                       | Authentication & CSRF         |
+| validators.py        | C:\ScreenRecorderServer\                       | Input validation              |
+| video_processor.py   | C:\ScreenRecorderServer\                       | Thumbnail generation          |
+| websocket_manager.py | C:\ScreenRecorderServer\                       | WebSocket support             |
+| routes/api.py        | C:\ScreenRecorderServer\routes\                | API endpoints                 |
+| private_key.pem      | C:\ScreenRecorderServer\keys\                  | License signing key (SECRET!) |
+| public_key.pem       | C:\ScreenRecorderServer\keys\                  | License validation key        |
+| .env                 | C:\ScreenRecorderServer\                       | Environment configuration     |
+| Database (SQLite)    | C:\ScreenRecorderServer\instance\              | SQLite database               |
+| Uploaded Videos      | C:\ScreenRecorderServer\uploads\{machine_id}\  | Video storage                 |
+| Thumbnails           | C:\ScreenRecorderServer\uploads\thumbnails\    | Video thumbnails              |
+| Server log           | C:\ScreenRecorderServer\logs\server.log        | Server logs                   |
+| Service stdout       | C:\ScreenRecorderServer\logs\service.log       | Service output                |
+| Service stderr       | C:\ScreenRecorderServer\logs\service_error.log | Service errors                |
 
 ---
 
