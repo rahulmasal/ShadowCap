@@ -48,7 +48,7 @@
 │                              │                 │                              │
 │  ┌────────────────────────┐  │                 │  ┌────────────────────────┐  │
 │  │   4. Heartbeat Thread  │  │                 │  │   4. Admin Dashboard   │  │
-│  │   (Monitors server)    │  │◄────────────────│  │   http://server:5000   │  │
+│  │   (Monitors server)    │  │◄────────────────│  │   <http://server:5000>   │  │
 │  └────────────────────────┘  │   Heartbeat OK  │  │   /admin               │  │
 │                              │                 │  │                        │  │
 │                              │                 │  │   • View all clients   │  │
@@ -87,7 +87,7 @@ This will:
 └── Start Flask server on port 5000
 
 Access Admin Dashboard:
-URL: http://localhost:5000/admin
+URL: <http://localhost:5000/admin>
 Password: (set in .env file as ADMIN_PASSWORD)
 ```
 
@@ -107,7 +107,7 @@ Copy this ID - you'll need it to generate a license.
 ```
 Step 3: Generate License (on Server Dashboard)
 ──────────────────────────────────────────────
-1. Go to: http://server-ip:5000/admin
+1. Go to: <http://server-ip:5000/admin>
 2. Login with admin password
 3. Click "Generate License"
 4. Enter Machine ID from client
@@ -126,7 +126,7 @@ Step 4: Configure Client
 Create config.json on client:
 
 {
-    "server_url": "http://YOUR_SERVER_IP:5000",
+    "server_url": "<http://YOUR_SERVER_IP:5000",>
     "upload_interval": 300,
     "recording_fps": 10,
     "chunk_duration": 60,
@@ -206,7 +206,7 @@ When client starts (screen_recorder.py):
 
 6. HEARTBEAT PHASE (background thread)
    ├── Every 60 seconds (configurable)
-   ├── POST to: http://server:5000/api/v1/heartbeat
+   ├── POST to: <http://server:5000/api/v1/heartbeat>
    ├── Include: license key, machine ID
    ├── Update server_reachable flag
    └── Log connection status
@@ -226,7 +226,7 @@ When client starts (screen_recorder.py):
    │   ├── Attempt upload with retry
    │   └── On success → Remove from queue
    ├── Then, upload current chunks:
-   │   ├── POST to: http://server:5000/api/v1/upload
+   │   ├── POST to: <http://server:5000/api/v1/upload>
    │   ├── Headers: X-License-Key, X-Machine-ID
    │   └── Server validates & saves
    ├── On success → Delete local copy
@@ -960,7 +960,7 @@ uninstall.bat
 
 ```bash
 # API health check
-curl http://localhost:5000/api/v1/health
+curl <http://localhost:5000/api/v1/health>
 ```
 
 ### Logs

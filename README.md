@@ -250,7 +250,7 @@ Deploy the server using Docker for easy setup and isolation:
    ```
 
 3. **Access the admin dashboard:**
-   Open `http://localhost:5000/admin` in your browser
+   Open `<http://localhost:5000/admin`> in your browser
 
 **Docker Security Features:**
 
@@ -276,7 +276,7 @@ For production deployment, install as a Windows service:
    - Run in the background
 
 3. **Access the admin dashboard:**
-   Open `http://localhost:5000/admin` in your browser
+   Open `<http://localhost:5000/admin`> in your browser
 
 4. **Manage the service:**
 
@@ -371,7 +371,7 @@ See [`server/migrations/README.md`](server/migrations/README.md) for detailed mi
 ### Admin Dashboard
 
 1. **Login:**
-   - Navigate to `http://server-ip:5000/admin/login`
+   - Navigate to `<http://server-ip:5000/admin/login`>
    - Enter the admin password
 
 2. **Generate License:**
@@ -419,7 +419,7 @@ Edit the `config.json` file:
 
 ```json
 {
-  "server_url": "http://your-server-ip:5000",
+  "server_url": "<http://your-server-ip:5000",>
   "upload_interval": 300,
   "recording_fps": 10,
   "video_quality": 80,
@@ -443,7 +443,7 @@ Edit the `config.json` file:
 
 | Setting                | Description                      | Default               |
 | ---------------------- | -------------------------------- | --------------------- |
-| server_url             | Server URL for uploads           | http://localhost:5000 |
+| server_url             | Server URL for uploads           | <http://localhost:5000> |
 | upload_interval        | Seconds between uploads          | 300                   |
 | recording_fps          | Frames per second                | 10                    |
 | video_quality          | Video quality (1-100)            | 80                    |

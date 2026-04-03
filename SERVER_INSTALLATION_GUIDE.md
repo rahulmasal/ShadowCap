@@ -23,7 +23,7 @@ Docker provides an easy way to run the server without installing Python or manag
 ### Step 1: Install Docker
 
 1. **Download Docker Desktop:**
-   - Go to https://www.docker.com/products/docker-desktop/
+   - Go to <https://www.docker.com/products/docker-desktop/>
    - Click "Download for Windows"
    - Run the installer
    - Follow the installation wizard
@@ -96,7 +96,7 @@ cd ..
 ### Step 5: Access the Admin Dashboard
 
 1. Open your web browser
-2. Go to: http://localhost:5000/admin
+2. Go to: <http://localhost:5000/admin>
 3. Enter the password you set in Step 4
 4. Click "Login"
 
@@ -128,7 +128,7 @@ If you prefer not to use Docker, follow these steps:
 ## Step 1: Install Python
 
 1. **Download Python:**
-   - Go to https://www.python.org/downloads/
+   - Go to <https://www.python.org/downloads/>
    - Click the yellow "Download Python" button
    - Download the latest version (e.g., Python 3.11 or 3.12)
 
@@ -215,7 +215,7 @@ If you prefer not to use Docker, follow these steps:
 
 3. **Verify the server is running:**
    - Open your web browser
-   - Go to: http://localhost:5000/admin
+   - Go to: <http://localhost:5000/admin>
    - You should see the login page
 
 ## Step 6: Access the Admin Dashboard
@@ -254,7 +254,7 @@ If you prefer not to use Docker, follow these steps:
 
 - Stop any existing server: `docker-compose down`
 - Or change the port in `docker-compose.yml` (e.g., change "5000:5000" to "5001:5000")
-- Then access via http://localhost:5001/admin
+- Then access via <http://localhost:5001/admin>
 
 #### Problem: Container keeps restarting
 
@@ -299,7 +299,7 @@ If you prefer not to use Docker, follow these steps:
 
 - Make sure the server is running: `sc query ScreenRecorderServer`
 - Check the logs: `type "C:\ScreenRecorderServer\logs\service.log"`
-- Try accessing: http://127.0.0.1:5000/admin instead
+- Try accessing: <http://127.0.0.1:5000/admin> instead
 
 ## Managing the Server
 

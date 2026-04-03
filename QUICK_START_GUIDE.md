@@ -44,7 +44,7 @@ If you don't have Docker, follow these steps:
 
 ### Step 2: Install Python (if not already installed)
 
-1. Go to https://www.python.org/downloads/
+1. Go to <https://www.python.org/downloads/>
 2. Click "Download Python"
 3. Run the installer
 4. **IMPORTANT:** Check "Add Python to PATH" ✅
@@ -88,7 +88,7 @@ If you don't have Docker, follow these steps:
 ### Step 6: Access Admin Dashboard
 
 1. Open your web browser
-2. Go to: http://localhost:5000/admin
+2. Go to: <http://localhost:5000/admin>
 3. Enter the password you set in Step 4
 4. Click "Login"
 
@@ -110,7 +110,7 @@ If you don't have Docker, follow these steps:
 
 ### Step 2: Generate License
 
-1. Go to the admin dashboard: http://localhost:5000/admin
+1. Go to the admin dashboard: <http://localhost:5000/admin>
 2. Click "Generate License"
 3. Paste the Machine ID from Step 1
 4. Set expiry days: 365
@@ -134,7 +134,7 @@ If you don't have Docker, follow these steps:
 
 ### Step 4: Verify Installation
 
-1. Go to the admin dashboard: http://localhost:5000/admin
+1. Go to the admin dashboard: <http://localhost:5000/admin>
 2. You should see your client listed
 3. The status should show "Active"
 
@@ -146,7 +146,7 @@ If you don't have Docker, follow these steps:
 
 ### From Admin Dashboard:
 
-1. Go to: http://localhost:5000/admin
+1. Go to: <http://localhost:5000/admin>
 2. Click on your client (shows Machine ID)
 3. You'll see a list of uploaded videos
 4. Click "Download" to save a video
@@ -258,7 +258,7 @@ type "C:\ScreenRecorderClient\ScreenRecSvc\client.log"
 
 You now have:
 
-- ✅ Server running and accessible at http://localhost:5000/admin
+- ✅ Server running and accessible at <http://localhost:5000/admin>
 - ✅ Client installed and recording on the target computer
 - ✅ Videos automatically uploading to the server
 - ✅ Both services starting automatically on boot

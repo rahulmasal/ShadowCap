@@ -5,7 +5,7 @@
 The Screen Recorder Server provides a RESTful API for video uploads,
 license management, and client communication.
 
-**Base URL:** `http://your-server:5000`
+**Base URL:** `<http://your-server:5000`>
 
 **API Version:** v1
 
@@ -269,10 +269,10 @@ Stream a video file with HTTP Range support for partial content.
 
 ```bash
 # Stream full video
-curl http://server:5000/api/v1/stream/abc123/video.mp4 -o video.mp4
+curl <http://server:5000/api/v1/stream/abc123/video.mp4> -o video.mp4
 
 # Stream partial video (for seeking)
-curl -H "Range: bytes=0-1023" http://server:5000/api/v1/stream/abc123/video.mp4
+curl -H "Range: bytes=0-1023" <http://server:5000/api/v1/stream/abc123/video.mp4>
 ```
 
 ---
@@ -398,7 +398,7 @@ WebSocket support is available when `flask-socketio` is installed.
 
 ```javascript
 // Connect to WebSocket
-const socket = io("http://your-server:5000");
+const socket = io("<http://your-server:5000");>
 
 // Register as admin
 socket.emit("register_admin");
@@ -432,7 +432,7 @@ socket.emit("register_client", { machine_id: "your-machine-id" });
 
 ```javascript
 // Admin dashboard example
-const socket = io("http://your-server:5000");
+const socket = io("<http://your-server:5000");>
 
 socket.on("connect", () => {
   socket.emit("register_admin");
@@ -513,7 +513,7 @@ For backward compatibility, legacy endpoints are available without version prefi
 import requests
 
 # Configuration
-SERVER_URL = "http://your-server:5000"
+SERVER_URL = "<http://your-server:5000">
 LICENSE_KEY = "your-license-key"
 MACHINE_ID = "your-machine-id"
 
@@ -571,7 +571,7 @@ def get_video_info(machine_id, filename):
 ```html
 <video controls>
   <source
-    src="http://server:5000/api/v1/stream/abc123/video.mp4"
+    src="<http://server:5000/api/v1/stream/abc123/video.mp4">
     type="video/mp4"
   />
   Your browser does not support the video tag.

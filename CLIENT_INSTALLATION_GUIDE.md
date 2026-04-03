@@ -43,7 +43,7 @@ Before starting, make sure you have:
 
 1. **Go to the server admin dashboard:**
    - Open your web browser
-   - Go to: http://server-ip:5000/admin
+   - Go to: <http://server-ip:5000/admin>
    - (Replace "server-ip" with your server's IP address)
    - Login with your admin password
 
@@ -107,7 +107,7 @@ Before starting, make sure you have:
 If you prefer to run the client as a Python script:
 
 1. **Install Python:**
-   - Download from https://www.python.org/downloads/
+   - Download from <https://www.python.org/downloads/>
    - Check "Add Python to PATH" during installation
 
 2. **Install dependencies:**
@@ -178,7 +178,7 @@ If you prefer to run the client as a Python script:
 
    ```json
    {
-     "server_url": "http://your-server-ip:5000",
+     "server_url": "<http://your-server-ip:5000",>
      "upload_interval": 300,
      "recording_fps": 10,
      "video_quality": 80,
@@ -327,7 +327,7 @@ type "C:\ScreenRecorderClient\ScreenRecSvc\client.log" | findstr "License"
 
 - Make sure you're using the correct server IP address
 - Check if the server is running
-- Try accessing: http://localhost:5000/admin (if on same computer)
+- Try accessing: <http://localhost:5000/admin> (if on same computer)
 
 ## Managing the Client
 
