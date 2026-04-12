@@ -270,7 +270,7 @@ For production deployment, install as a Windows service:
    ```
 
 2. **The service will:**
-   - Install to `C:\Program Files\ScreenRecorderServer`
+   - Install to `C:\ScreenRecorderServer`
    - Register as Windows service "ScreenRecorderServer"
    - Start automatically on system boot
    - Run in the background
