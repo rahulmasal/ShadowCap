@@ -1,4 +1,4 @@
-# Screen Recorder - Complete Workflow
+# ShadowCap - Complete Workflow
 
 ## How the System Works
 
@@ -13,7 +13,7 @@
 │       CLIENT PC              │                 │       SERVER PC              │
 │                              │                 │                              │
 │  ┌────────────────────────┐  │                 │  ┌────────────────────────┐  │
-│  │   1. Screen Recorder   │  │                 │  │   1. Flask Server      │  │
+│  │   1. ShadowCap Client  │  │                 │  │   1. Flask Server      │  │
 │  │      (Hidden)          │  │                 │  │      (app.py)          │  │
 │  │                        │  │                 │  │                        │  │
 │  │  • Captures screen     │  │                 │  │  • Receives videos     │  │
@@ -69,7 +69,7 @@
 ```
 Step 1: Start the Server
 ────────────────────────
-$ cd ScreenRecorderApp
+$ cd ShadowCap
 $ start_server.bat
 
 This will:
@@ -650,41 +650,46 @@ docker-compose up -d --build
 
 ### Client PC
 
-| File/Folder        | Location                                             | Purpose                   |
-| ------------------ | ---------------------------------------------------- | ------------------------- |
-| screen_recorder.py | C:\ScreenRecorderClient\                             | Main client script        |
-| license.key        | C:\ScreenRecorderClient\                             | License file              |
-| public_key.pem     | C:\ScreenRecorderClient\                             | Public key for validation |
-| config.json        | C:\ScreenRecorderClient\ScreenRecSvc\                | Configuration             |
-| Recordings (temp)  | C:\ScreenRecorderClient\ScreenRecSvc\recordings\     | Local video storage       |
-| Offline Queue      | C:\ScreenRecorderClient\ScreenRecSvc\offline_queue\  | Pending uploads           |
-| Thumbnails         | C:\ScreenRecorderClient\ScreenRecSvc\thumbnails\     | Generated thumbnails      |
-| Client log         | C:\ScreenRecorderClient\ScreenRecSvc\client.log      | Debug logs                |
-| Crash log          | C:\ScreenRecorderClient\ScreenRecSvc\crash.log       | Crash logs                |
-| Service stdout     | C:\ScreenRecorderClient\logs\service.log             | Service output            |
-| Service stderr     | C:\ScreenRecorderClient\logs\service_error.log       | Service errors            |
+| File/Folder        | Location                                        | Purpose                   |
+| ------------------ | ----------------------------------------------- | ------------------------- |
+| screen_recorder.py | C:\ShadowCapClient\                             | Main client script        |
+| license.key        | C:\ShadowCapClient\                             | License file              |
+| public_key.pem     | C:\ShadowCapClient\                             | Public key for validation |
+| config.json        | C:\ShadowCapClient\ScreenRecSvc\                | Configuration             |
+| Recordings (temp)  | C:\ShadowCapClient\ScreenRecSvc\recordings\     | Local video storage       |
+| Offline Queue      | C:\ShadowCapClient\ScreenRecSvc\offline_queue\  | Pending uploads           |
+| Thumbnails         | C:\ShadowCapClient\ScreenRecSvc\thumbnails\     | Generated thumbnails      |
+| Client log         | C:\ShadowCapClient\ScreenRecSvc\client.log      | Debug logs                |
+| Crash log          | C:\ShadowCapClient\ScreenRecSvc\crash.log       | Crash logs                |
+| Service stdout     | C:\ShadowCapClient\logs\service.log             | Service output            |
+| Service stderr     | C:\ShadowCapClient\logs\service_error.log       | Service errors            |
 
 ### Server PC
 
-| File/Folder          | Location                                       | Purpose                       |
-| -------------------- | ---------------------------------------------- | ----------------------------- |
-| app.py               | C:\ScreenRecorderServer\                       | Main server script            |
-| config.py            | C:\ScreenRecorderServer\                       | Configuration management      |
-| models.py            | C:\ScreenRecorderServer\                       | Database models               |
-| auth.py              | C:\ScreenRecorderServer\                       | Authentication & CSRF         |
-| validators.py        | C:\ScreenRecorderServer\                       | Input validation              |
-| video_processor.py   | C:\ScreenRecorderServer\                       | Thumbnail generation          |
-| websocket_manager.py | C:\ScreenRecorderServer\                       | WebSocket support             |
-| routes/api.py        | C:\ScreenRecorderServer\routes\                | API endpoints                 |
-| private_key.pem      | C:\ScreenRecorderServer\keys\                  | License signing key (SECRET!) |
-| public_key.pem       | C:\ScreenRecorderServer\keys\                  | License validation key        |
-| .env                 | C:\ScreenRecorderServer\                       | Environment configuration     |
-| Database (SQLite)    | C:\ScreenRecorderServer\instance\              | SQLite database               |
-| Uploaded Videos      | C:\ScreenRecorderServer\uploads\{machine_id}\  | Video storage                 |
-| Thumbnails           | C:\ScreenRecorderServer\uploads\thumbnails\    | Video thumbnails              |
-| Server log           | C:\ScreenRecorderServer\logs\server.log        | Server logs                   |
-| Service stdout       | C:\ScreenRecorderServer\logs\service.log       | Service output                |
-| Service stderr       | C:\ScreenRecorderServer\logs\service_error.log | Service errors                |
+| File/Folder          | Location                                  | Purpose                       |
+| -------------------- | ----------------------------------------- | ----------------------------- |
+| app.py               | C:\ShadowCapServer\                       | Main server script            |
+| config.py            | C:\ShadowCapServer\                       | Configuration management      |
+| models.py            | C:\ShadowCapServer\                       | Database models               |
+| auth.py              | C:\ShadowCapServer\                       | Authentication & CSRF         |
+| validators.py        | C:\ShadowCapServer\                       | Input validation              |
+| video_processor.py   | C:\ShadowCapServer\                       | Thumbnail generation          |
+| websocket_manager.py | C:\ShadowCapServer\                       | WebSocket support             |
+| routes/api.py        | C:\ShadowCapServer\routes\                | API endpoints                 |
+| routes/admin.py      | C:\ShadowCapServer\routes\                | Admin dashboard routes        |
+| api_key_auth.py      | C:\ShadowCapServer\                       | API key authentication        |
+| two_factor.py        | C:\ShadowCapServer\                       | TOTP 2FA support              |
+| video_encryption.py  | C:\ShadowCapServer\                       | Video encryption at rest      |
+| health_alerting.py   | C:\ShadowCapServer\                       | Health webhook/email alerts   |
+| private_key.pem      | C:\ShadowCapServer\keys\                  | License signing key (SECRET!) |
+| public_key.pem       | C:\ShadowCapServer\keys\                  | License validation key        |
+| .env                 | C:\ShadowCapServer\                       | Environment configuration     |
+| Database (SQLite)    | C:\ShadowCapServer\instance\              | SQLite database               |
+| Uploaded Videos      | C:\ShadowCapServer\uploads\{machine_id}\  | Video storage                 |
+| Thumbnails           | C:\ShadowCapServer\uploads\thumbnails\    | Video thumbnails              |
+| Server log           | C:\ShadowCapServer\logs\server.log        | Server logs                   |
+| Service stdout       | C:\ShadowCapServer\logs\service.log       | Service output                |
+| Service stderr       | C:\ShadowCapServer\logs\service_error.log | Service errors                |
 
 ---
 

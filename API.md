@@ -1,11 +1,10 @@
-# Screen Recorder API Documentation
+# ShadowCap API Documentation
 
 ## Overview
 
-The Screen Recorder Server provides a RESTful API for video uploads,
-license management, and client communication.
+The ShadowCap server provides a RESTful API for video uploads, license management, and client communication.
 
-**Base URL:** `<http://your-server:5000`>
+**Base URL:** `http://your-server:5000`
 
 **API Version:** v1
 
@@ -15,35 +14,38 @@ license management, and client communication.
 
 ### License-Based Authentication
 
-Most API endpoints require a valid license key. Include the license
-in requests using one of these methods:
+Most API endpoints require a valid license key. Include the license in requests using one of these methods:
 
 **Header (Preferred):**
 
 ```text
-
-X-License-Key: `your-license-key`
-
-X-Machine-ID: <your-machine-id>
-
+X-License-Key: your-license-key
+X-Machine-ID: your-machine-id
 ```
 
 Or alternatively:
 
 ```text
-
-X-License-Token: `your-license-key`
-
-X-Machine-ID: <your-machine-id>
-
+X-License-Token: your-license-key
+X-Machine-ID: your-machine-id
 ```
 
 **Form Data:**
 
 ```
-license: `your-license-key`
-machine_id: <your-machine-id>
+license: your-license-key
+machine_id: your-machine-id
 ```
+
+### API Key Authentication
+
+For programmatic access, API keys can be generated via the admin dashboard or command line:
+
+```text
+X-API-Key: sc_your-api-key-here
+```
+
+API keys support permission scopes: `read`, `write`, `admin`.
 
 ---
 
@@ -107,10 +109,10 @@ Upload a recorded video to the server.
 
 **Error Responses:**
 
-- `400 Bad Request` - Invalid file or missing data
-- `401 Unauthorized` - Invalid or expired license
-- `413 Payload Too Large` - File exceeds size limit (500MB)
-- `429 Too Many Requests` - Rate limit exceeded
+- `400 Bad Request` — Invalid file or missing data
+- `401 Unauthorized` — Invalid or expired license
+- `413 Payload Too Large` — File exceeds size limit (500MB)
+- `429 Too Many Requests` — Rate limit exceeded
 
 ---
 
@@ -126,8 +128,8 @@ Validate a license key.
 
 ```json
 {
-  "license": "<license-key>",
-  "machine_id": "<machine-id>"
+  "license": "license-key",
+  "machine_id": "machine-id"
 }
 ```
 
@@ -232,7 +234,7 @@ Get the server's public key for license validation.
 ### Stream Video
 
 ```http
-GET /api/v1/stream/<machine_id>/<filename>
+GET /api/v1/video/<machine_id>/<filename>
 ```
 
 Stream a video file with HTTP Range support for partial content.
@@ -252,27 +254,18 @@ Stream a video file with HTTP Range support for partial content.
 
 **Response:**
 
-- `200 OK` - Full video stream
-- `206 Partial Content` - Partial video stream (when Range header is provided)
-- `404 Not Found` - Video not found
-
-**Response Headers:**
-
-| Header         | Description                      |
-| -------------- | -------------------------------- |
-| Content-Type   | video/mp4                        |
-| Content-Length | File size in bytes               |
-| Accept-Ranges  | bytes                            |
-| Content-Range  | Byte range (for partial content) |
+- `200 OK` — Full video stream
+- `206 Partial Content` — Partial video stream (when Range header is provided)
+- `404 Not Found` — Video not found
 
 **Example:**
 
 ```bash
 # Stream full video
-curl <http://server:5000/api/v1/stream/abc123/video.mp4> -o video.mp4
+curl http://server:5000/api/v1/video/abc123/video.mp4 -o video.mp4
 
 # Stream partial video (for seeking)
-curl -H "Range: bytes=0-1023" <http://server:5000/api/v1/stream/abc123/video.mp4>
+curl -H "Range: bytes=0-1023" http://server:5000/api/v1/video/abc123/video.mp4
 ```
 
 ---
@@ -280,28 +273,15 @@ curl -H "Range: bytes=0-1023" <http://server:5000/api/v1/stream/abc123/video.mp4
 ### Get Video Thumbnail
 
 ```http
-GET /api/v1/thumbnail/<machine_id>/<filename>
+GET /api/v1/video/<machine_id>/<filename>/thumbnail
 ```
 
 Get or generate a thumbnail for a video.
 
-**Parameters:**
-
-| Parameter  | Type   | Description       |
-| ---------- | ------ | ----------------- |
-| machine_id | String | Client machine ID |
-| filename   | String | Video filename    |
-
 **Response:**
 
-- `200 OK` - JPEG thumbnail image
-- `404 Not Found` - Video or thumbnail not available
-
-**Response Headers:**
-
-| Header       | Description |
-| ------------ | ----------- |
-| Content-Type | image/jpeg  |
+- `200 OK` — JPEG thumbnail image
+- `404 Not Found` — Video or thumbnail not available
 
 **Notes:**
 
@@ -319,13 +299,6 @@ GET /api/v1/video-info/<machine_id>/<filename>
 
 Get detailed information about a video file.
 
-**Parameters:**
-
-| Parameter  | Type   | Description       |
-| ---------- | ------ | ----------------- |
-| machine_id | String | Client machine ID |
-| filename   | String | Video filename    |
-
 **Response:**
 
 ```json
@@ -338,17 +311,6 @@ Get detailed information about a video file.
   "fps": 30.0
 }
 ```
-
-**Fields:**
-
-| Field    | Type    | Description                   |
-| -------- | ------- | ----------------------------- |
-| exists   | Boolean | Whether the video file exists |
-| size     | Integer | File size in bytes            |
-| duration | Float   | Video duration in seconds     |
-| width    | Integer | Video width in pixels         |
-| height   | Integer | Video height in pixels        |
-| fps      | Float   | Frames per second             |
 
 ---
 
@@ -364,9 +326,10 @@ POST /admin/login
 
 **Form Data:**
 
-| Field    | Type   | Required | Description    |
-| -------- | ------ | -------- | -------------- |
-| password | String | Yes      | Admin password |
+| Field      | Type   | Required | Description    |
+| ---------- | ------ | -------- | -------------- |
+| password   | String | Yes      | Admin password |
+| csrf_token | String | Yes      | CSRF token     |
 
 **Response:** Redirects to admin dashboard on success.
 
@@ -385,6 +348,7 @@ POST /admin/generate-license
 | machine_id  | String  | Yes      | Target machine ID                    |
 | expiry_days | Integer | No       | Days until expiration (default: 365) |
 | features    | List    | No       | Enabled features                     |
+| csrf_token  | String  | Yes      | CSRF token                           |
 
 **Response:** Renders license result page with generated license key.
 
@@ -398,7 +362,7 @@ WebSocket support is available when `flask-socketio` is installed.
 
 ```javascript
 // Connect to WebSocket
-const socket = io("<http://your-server:5000");>
+const socket = io("http://your-server:5000");
 
 // Register as admin
 socket.emit("register_admin");
@@ -428,25 +392,6 @@ socket.emit("register_client", { machine_id: "your-machine-id" });
 | video_uploaded   | Video upload notification |
 | client_error     | Client error report       |
 
-### Example Usage
-
-```javascript
-// Admin dashboard example
-const socket = io("<http://your-server:5000");>
-
-socket.on("connect", () => {
-  socket.emit("register_admin");
-});
-
-socket.on("client_status", (data) => {
-  console.log(`Client ${data.machine_id}: ${data.status}`);
-});
-
-socket.on("video_uploaded", (data) => {
-  console.log(`Video uploaded: ${data.filename} from ${data.machine_id}`);
-});
-```
-
 ---
 
 ## Error Handling
@@ -466,11 +411,11 @@ All errors follow a consistent format:
 | ---- | --------------------------------------- |
 | 200  | Success                                 |
 | 206  | Partial Content (video streaming)       |
-| 400  | Bad Request - Invalid input             |
-| 401  | Unauthorized - Invalid/expired license  |
-| 403  | Forbidden - CSRF token invalid          |
+| 400  | Bad Request — Invalid input             |
+| 401  | Unauthorized — Invalid/expired license  |
+| 403  | Forbidden — CSRF token invalid          |
 | 404  | Not Found                               |
-| 429  | Too Many Requests - Rate limit exceeded |
+| 429  | Too Many Requests — Rate limit exceeded |
 | 500  | Internal Server Error                   |
 
 ---
@@ -484,6 +429,8 @@ API endpoints have rate limits to prevent abuse:
 | /upload           | 30 requests | 60 seconds |
 | /validate-license | 10 requests | 60 seconds |
 | /heartbeat        | 60 requests | 60 seconds |
+
+Rate limiting is backed by Redis when `RATE_LIMIT_STORAGE_URI` is configured, otherwise falls back to in-memory storage.
 
 When rate limited, the API returns `429 Too Many Requests`.
 
@@ -511,9 +458,10 @@ For backward compatibility, legacy endpoints are available without version prefi
 
 ```python
 import requests
+from datetime import datetime, timezone
 
 # Configuration
-SERVER_URL = "<http://your-server:5000">
+SERVER_URL = "http://your-server:5000"
 LICENSE_KEY = "your-license-key"
 MACHINE_ID = "your-machine-id"
 
@@ -527,7 +475,7 @@ def upload_video(video_path):
 
     with open(video_path, "rb") as f:
         files = {"video": (video_path.name, f, "video/mp4")}
-        data = {"timestamp": datetime.utcnow().isoformat()}
+        data = {"timestamp": datetime.now(timezone.utc).isoformat()}
 
         response = requests.post(url, files=files, data=data, headers=headers)
 
@@ -547,7 +495,7 @@ def send_heartbeat():
 
 # Stream video
 def stream_video(machine_id, filename, output_path):
-    url = f"{SERVER_URL}/api/v1/stream/{machine_id}/{filename}"
+    url = f"{SERVER_URL}/api/v1/video/{machine_id}/{filename}"
 
     response = requests.get(url, stream=True)
 
@@ -556,12 +504,6 @@ def stream_video(machine_id, filename, output_path):
             f.write(chunk)
 
     return output_path
-
-# Get video info
-def get_video_info(machine_id, filename):
-    url = f"{SERVER_URL}/api/v1/video-info/{machine_id}/{filename}"
-    response = requests.get(url)
-    return response.json()
 ```
 
 ---
@@ -571,7 +513,7 @@ def get_video_info(machine_id, filename):
 ```html
 <video controls>
   <source
-    src="<http://server:5000/api/v1/stream/abc123/video.mp4">
+    src="http://server:5000/api/v1/video/abc123/video.mp4"
     type="video/mp4"
   />
   Your browser does not support the video tag.
@@ -586,36 +528,7 @@ The streaming endpoint supports HTTP Range requests, enabling:
 
 ---
 
-## Recent Improvements
-
-### Custom Exceptions
-
-The API now uses a comprehensive exception hierarchy for better error handling:
-
-```python
-from shared.exceptions import (
-    LicenseError,
-    LicenseExpiredError,
-    LicenseInvalidError,
-    LicenseMachineMismatchError,
-    UploadError,
-    UploadFailedError,
-    UploadSizeExceededError,
-    RecordingError,
-    RecordingStartError,
-    RecordingStopError,
-)
-```
-
-### Security Enhancements
-
-- **Timing Attack Protection**: Password validation uses constant-time comparison
-- **User Enumeration Prevention**: Generic error messages prevent user enumeration
-- **Rate Limiting**: All endpoints protected against abuse
-
-### Testing
-
-Unit tests are available for critical modules:
+## Testing
 
 ```bash
 # Run all tests
@@ -627,11 +540,13 @@ pytest --cov=shared --cov=server
 # Run specific tests
 pytest tests/test_license_manager.py
 pytest tests/test_validators.py
+pytest tests/test_auth.py
+pytest tests/test_models.py
 ```
 
-### Docker Support
+---
 
-The server can be deployed using Docker:
+## Docker Deployment
 
 ```bash
 # Build and start with Docker Compose
@@ -642,6 +557,9 @@ docker-compose logs -f server
 
 # Stop services
 docker-compose down
+
+# Rebuild after changes
+docker-compose up -d --build
 ```
 
 See [README.md](README.md) for detailed Docker deployment instructions.

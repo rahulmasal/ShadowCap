@@ -1,104 +1,91 @@
-# Server Installation Guide (Step-by-Step for Beginners)
+# ShadowCap — Server Installation Guide
 
-This guide will help you install the Screen Recorder Server on your Windows computer. Follow each step carefully.
+Step-by-step guide to install the ShadowCap server on your Windows computer.
 
 ## Prerequisites
 
-Before starting, make sure you have:
-
-- Windows 10 or Windows 11
+- Windows 10 or Windows 11 (or any Linux/macOS with Docker)
 - Internet connection
 - Administrator access to your computer
 
 ## Installation Methods
 
-You can install the server using either Docker (recommended for easy setup) or manual installation.
+You can install the server using either **Docker** (recommended) or **manual installation**.
 
 ---
 
 ## Method 1: Docker Installation (Recommended)
 
-Docker provides an easy way to run the server without installing Python or managing dependencies.
-
 ### Step 1: Install Docker
 
-1. **Download Docker Desktop:**
-   - Go to <https://www.docker.com/products/docker-desktop/>
-   - Click "Download for Windows"
-   - Run the installer
-   - Follow the installation wizard
-   - Restart your computer when prompted
+1. Download Docker Desktop from https://www.docker.com/products/docker-desktop/
+2. Run the installer and follow the wizard
+3. Restart your computer when prompted
+4. Verify: open Command Prompt and run `docker --version`
 
-2. **Verify Docker is installed:**
-   - Open Command Prompt
-   - Type: `docker --version`
-   - You should see something like "Docker version 24.x.x"
+### Step 2: Download ShadowCap
 
-### Step 2: Download the Screen Recorder Server
-
-1. **Download the project:**
-   - Go to the project repository
-   - Click the green "Code" button
-   - Select "Download ZIP"
-   - Save the ZIP file to your Desktop
-
-2. **Extract the files:**
-   - Right-click the downloaded ZIP file
-   - Select "Extract All..."
-   - Click "Extract"
-   - You should see a folder named "ScreenRecorderApp" on your Desktop
-
-### Step 3: Start the Server with Docker
-
-1. **Open Command Prompt:**
-   - Press `Windows Key + R`
-   - Type `cmd` and press Enter
-
-2. **Navigate to the project folder:**
+1. Clone the repository:
 
    ```bash
-   cd Desktop\ScreenRecorderApp
+   git clone https://github.com/rahulmasal/ShadowCap.git
+   cd ShadowCap
    ```
 
-3. **Start the server:**
+   Or download the ZIP from GitHub and extract it.
 
-   ```bash
-   docker-compose up -d
-   ```
+### Step 3: Configure Environment Variables
 
-4. **Wait for setup to complete:**
-   - First time may take 2-3 minutes to download images
-   - You'll see messages about downloading and starting containers
-
-### Step 4: Configure the Server
-
-1. **Create environment file:**
+1. Create the environment file:
 
    ```bash
    cd server
    copy .env.example .env
    ```
 
-2. **Edit the configuration:**
-   - Open `.env` file in Notepad
-   - Change `SECRET_KEY` to a random string (at least 32 characters)
-   - Change `ADMIN_PASSWORD` to a strong password (at least 12 characters)
-   - Save the file
+2. Edit `.env` in Notepad — **you MUST set these**:
 
-3. **Restart the server:**
-  
-   ```bash
-cd ..
-   docker-compose restart
+   ```ini
+   # Required — server will NOT start without these
+   SECRET_KEY=your-random-secret-key-at-least-32-characters
+   ADMIN_PASSWORD=your-secure-admin-password-at-least-12-chars
 
+   # Optional — private key encryption
+   KEY_PASSPHRASE=passphrase-to-encrypt-private-key
+
+   # Optional — PostgreSQL (defaults to SQLite)
+   DATABASE_URL=postgresql://shadowcap:password@db:5432/shadowcap
+
+   # Optional — Redis for rate limiting
+   RATE_LIMIT_STORAGE_URI=redis://redis:6379/0
+
+   # Optional — retention policies
+   AUDIT_LOG_RETENTION_DAYS=90
+   VIDEO_RETENTION_DAYS=0
+   VIDEO_DISK_LIMIT_MB=0
    ```
+
+3. Save the file
+
+### Step 4: Start the Server
+
+```bash
+cd ..   # back to project root
+docker-compose up -d
+```
+
+First time may take 2-3 minutes to download images. This starts:
+
+- **ShadowCap server** on port 5000
+- **PostgreSQL** database on port 5432 (optional)
+- **Redis** on port 6379 (optional)
 
 ### Step 5: Access the Admin Dashboard
 
 1. Open your web browser
-2. Go to: <http://localhost:5000/admin>
-3. Enter the password you set in Step 4
-4. Click "Login"
+2. Go to: `http://localhost:5000/admin`
+3. Enter the password you set in Step 3
+4. Click **"Login"**
 
 **Docker Management Commands:**
 
@@ -117,236 +104,208 @@ docker-compose restart
 
 # Check status
 docker-compose ps
+
+# Rebuild after code changes
+docker-compose up -d --build
 ```
 
 ---
 
 ## Method 2: Manual Installation
 
-If you prefer not to use Docker, follow these steps:
+### Step 1: Install Python
 
-## Step 1: Install Python
+1. Download Python from https://www.python.org/downloads/
+2. Run the installer
+3. **IMPORTANT:** Check **"Add Python to PATH"** ✅
+4. Click **"Install Now"**
+5. Verify: open Command Prompt, type `python --version`
 
-1. **Download Python:**
-   - Go to <https://www.python.org/downloads/>
-   - Click the yellow "Download Python" button
-   - Download the latest version (e.g., Python 3.11 or 3.12)
+### Step 2: Download ShadowCap
 
-2. **Install Python:**
-   - Run the downloaded installer
-   - **IMPORTANT:** Check the box that says "Add Python to PATH" ✅
-   - Click "Install Now"
-   - Wait for installation to complete
-   - Click "Close"
+1. Clone the repository:
 
-3. **Verify Python is installed:**
-   - Press `Windows Key + R` on your keyboard
-   - Type `cmd` and press Enter
-   - In the black window, type: `python --version`
-   - You should see something like "Python 3.11.x"
-   - If you see an error, restart your computer and try again
-
-## Step 2: Download the Screen Recorder Server
-
-1. **Download the project:**
-   - Go to the project repository
-   - Click the green "Code" button
-   - Select "Download ZIP"
-   - Save the ZIP file to your Desktop
-
-2. **Extract the files:**
-   - Right-click the downloaded ZIP file
-   - Select "Extract All..."
-   - Click "Extract"
-   - You should see a folder named "ScreenRecorderApp" on your Desktop
-
-## Step 3: Install the Server
-
-1. **Open the server folder:**
-   - Double-click the "ScreenRecorderApp" folder on your Desktop
-   - Double-click the "server" folder
-
-2. **Run the installation script:**
-   - Right-click on `install_server_service.bat`
-   - Select "Run as administrator"
-   - If prompted by Windows, click "Yes" to allow
-   - Wait for the installation to complete (this may take a few minutes)
-
-3. **What happens during installation:**
-   - The server files are copied to `C:\ScreenRecorderServer`
-   - A virtual environment is created
-   - Required packages are installed
-   - A Windows service is created
-   - The server starts automatically
-
-## Step 4: Configure the Server
-
-1. **Open the configuration file:**
-   - Press `Windows Key + R`
-   - Type: `notepad "C:\ScreenRecorderServer\.env"`
-   - Press Enter
-
-2. **Edit the configuration:**
-   - Find the line: `SECRET_KEY=your-secret-key-change-in-production-min-32-chars`
-   - Change it to a random string of letters and numbers (at least 32 characters)
-   - Example: `SECRET_KEY=MySecretKey1234567890abcdefghijklmnopqrst`
-   - Find the line: `ADMIN_PASSWORD=your-secure-admin-password-min-12-chars`
-   - Change it to a strong password (at least 12 characters)
-   - Example: `ADMIN_PASSWORD=MySecurePassword123!`
-
-3. **Save the file:**
-   - Press `Ctrl + S` to save
-   - Close Notepad
-
-## Step 5: Restart the Server
-
-1. **Open Command Prompt as Administrator:**
-   - Press `Windows Key`
-   - Type `cmd`
-   - Right-click "Command Prompt"
-   - Select "Run as administrator"
-
-2. **Restart the service:**
-
-   ```batch
-   sc stop ScreenRecorderServer
-   sc start ScreenRecorderServer
+   ```bash
+   git clone https://github.com/rahulmasal/ShadowCap.git
+   cd ShadowCap
    ```
 
-3. **Verify the server is running:**
-   - Open your web browser
-   - Go to: <http://localhost:5000/admin>
-   - You should see the login page
+   Or download the ZIP from GitHub and extract it.
 
-## Step 6: Access the Admin Dashboard
+### Step 3: Install the Server
 
-1. **Login:**
-   - Enter the password you set in Step 4
-   - Click "Login"
+1. Open the `server` folder
+2. Create a virtual environment:
 
-2. **You should now see:**
-   - Dashboard with statistics
-   - Client management section
-   - License generation section
+   ```batch
+   python -m venv venv
+   venv\Scripts\activate
+   ```
+
+3. Install dependencies:
+
+   ```batch
+   pip install -r requirements.txt
+   ```
+
+4. Or install with optional dependencies:
+
+   ```batch
+   pip install -r requirements.txt
+   pip install psycopg2-binary redis pyotp qrcode
+   ```
+
+### Step 4: Configure the Server
+
+1. Create the `.env` file:
+
+   ```batch
+   copy .env.example .env
+   ```
+
+2. Edit `.env` — set at minimum:
+
+   ```ini
+   SECRET_KEY=your-random-secret-key-at-least-32-characters
+   ADMIN_PASSWORD=your-secure-admin-password-at-least-12-chars
+   ```
+
+3. Initialize the database:
+
+   ```batch
+   python -c "from app import app, db; app.app_context().__enter__(); db.create_all()"
+   ```
+
+   Or use Flask-Migrate:
+
+   ```batch
+   flask db upgrade
+   ```
+
+### Step 5: Run the Server
+
+**Development mode:**
+
+```batch
+python app.py
+```
+
+**Production with Gunicorn (Linux/macOS):**
+
+```bash
+gunicorn -w 4 -b 0.0.0.0:5000 app:app
+```
+
+**As a Windows Service:**
+
+1. Right-click `install_server_service.bat`
+2. Select **"Run as administrator"**
+3. Wait for installation to complete
+
+### Step 6: Access the Admin Dashboard
+
+1. Open your web browser
+2. Go to: `http://localhost:5000/admin`
+3. Enter the password you set in Step 4
+4. Click **"Login"**
+
+---
+
+## Server Configuration Reference
+
+All settings can be configured via environment variables or the `.env` file:
+
+| Variable                   | Required | Default    | Description                                 |
+| -------------------------- | -------- | ---------- | ------------------------------------------- |
+| `SECRET_KEY`               | ✅ Yes   | —          | Flask secret key (min 32 chars)             |
+| `ADMIN_PASSWORD`           | ✅ Yes   | —          | Admin dashboard password (min 12 chars)     |
+| `DATABASE_URL`             | No       | SQLite     | PostgreSQL or SQLite connection string      |
+| `KEY_PASSPHRASE`           | No       | None       | Passphrase to encrypt the RSA private key   |
+| `RATE_LIMIT_STORAGE_URI`   | No       | Memory     | Redis URI for rate limit storage            |
+| `AUDIT_LOG_RETENTION_DAYS` | No       | 90         | Days to keep audit logs (0=forever)         |
+| `VIDEO_RETENTION_DAYS`     | No       | 0          | Days to keep videos (0=forever)             |
+| `VIDEO_DISK_LIMIT_MB`      | No       | 0          | Max total video storage in MB (0=unlimited) |
+| `FLASK_ENV`                | No       | production | `development` or `production`               |
+| `LOG_LEVEL`                | No       | INFO       | Logging level                               |
+
+---
 
 ## Troubleshooting
 
 ### Docker Issues
 
-#### Problem: "docker: command not found"
-
-**Solution:**
+**"docker: command not found"**
 
 - Make sure Docker Desktop is installed and running
 - Restart your computer after installing Docker
-- Check if Docker Desktop is running in your system tray
 
-#### Problem: "Cannot connect to the Docker daemon"
-
-**Solution:**
+**"Cannot connect to the Docker daemon"**
 
 - Open Docker Desktop and wait for it to start
-- Check if Docker Desktop shows "Docker Desktop is running"
 
-#### Problem: Port 5000 already in use
-
-**Solution:**
+**Port 5000 already in use**
 
 - Stop any existing server: `docker-compose down`
-- Or change the port in `docker-compose.yml` (e.g., change "5000:5000" to "5001:5000")
-- Then access via <http://localhost:5001/admin>
+- Or change the port in `docker-compose.yml` (e.g., `"5001:5000"`)
 
-#### Problem: Container keeps restarting
-
-**Solution:**
+**Container keeps restarting**
 
 - Check logs: `docker-compose logs -f server`
-- Make sure `.env` file exists and has correct values
-- Check if volumes have correct permissions
+- Make sure `.env` file exists with `SECRET_KEY` and `ADMIN_PASSWORD` set
 
 ### Manual Installation Issues
 
-#### Problem: "Python is not recognized"
-
-**Solution:**
+**"Python is not recognized"**
 
 - Restart your computer
-- If still not working, reinstall Python and make sure to check "Add Python to PATH"
+- Reinstall Python and check "Add Python to PATH"
 
-#### Problem: "Access denied" when running install script
+**"Access denied"**
 
-**Solution:**
+- Right-click and select "Run as administrator"
 
-- Make sure you right-click and select "Run as administrator"
-- If still not working, temporarily disable antivirus
+**Server won't start**
 
-#### Problem: Server won't start
+- Check if port 5000 is in use: `netstat -ano | findstr :5000`
+- Check logs for errors
 
-**Solution:**
-
-- Check if port 5000 is already in use
-- Open Command Prompt as Administrator and run:
-  
-```batch
-  netstat -ano | findstr :5000
-  ```
-
-- If you see a process using port 5000, stop it or change the port in `.env` file
-
-#### Problem: Can't access admin dashboard
-
-**Solution:**
+**Can't access admin dashboard**
 
 - Make sure the server is running: `sc query ScreenRecorderServer`
-- Check the logs: `type "C:\ScreenRecorderServer\logs\service.log"`
-- Try accessing: <http://127.0.0.1:5000/admin> instead
+- Try `http://127.0.0.1:5000/admin`
+
+---
 
 ## Managing the Server
 
-### Docker Management
+### Docker
 
 ```bash
-# Start the server
-docker-compose up -d
-
-# Stop the server
-docker-compose down
-
-# View logs
-docker-compose logs -f server
-
-# Restart the server
-docker-compose restart
-
-# Check status
-docker-compose ps
+docker-compose up -d        # Start
+docker-compose down          # Stop
+docker-compose logs -f server  # View logs
+docker-compose restart       # Restart
+docker-compose ps            # Check status
 ```
 
-### Windows Service Management
+### Windows Service
 
 ```batch
-# Start the server
-sc start ScreenRecorderServer
-
-# Stop the server
-sc stop ScreenRecorderServer
-
-# Check server status
-sc query ScreenRecorderServer
-
-# View server logs
-type "C:\ScreenRecorderServer\logs\service.log"
-
-# Uninstall the server
-uninstall_server_service.bat
+sc start ScreenRecorderServer   :: Start
+sc stop ScreenRecorderServer    :: Stop
+sc query ScreenRecorderServer   :: Check status
+uninstall_server_service.bat    :: Uninstall
 ```
+
+---
 
 ## Next Steps
 
-Now that your server is running, you can:
+Now that your server is running:
 
 1. Generate licenses for client computers
-2. Monitor uploaded videos
-3. Manage clients from the admin dashboard
+2. Monitor uploaded videos in the admin dashboard
+3. Configure retention policies if needed
+4. Set up health alerting webhooks for monitoring
 
-See the [Client Installation Guide](CLIENT_INSTALLATION_GUIDE.md) for installing the client on computers you want to monitor.
+See the [Client Installation Guide](CLIENT_INSTALLATION_GUIDE.md) for installing the client.
