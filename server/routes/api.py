@@ -134,12 +134,22 @@ def validate_license_in_request(fn):
         if not license_key and not license_token:
             return jsonify({"error": "License key required"}), 401
 
-        # Use app-level singleton instead of creating a new instance each time
+        # Reuse the app-level license_manager singleton from app.py
         from flask import current_app
 
         lm = current_app.config.get("_license_manager")
         if lm is None:
-            # Fallback: instantiate and cache if not yet in app config
+            # Fallback: use the module-level instance from app.py
+            try:
+                from app import license_manager as app_lm
+
+                lm = app_lm
+                current_app.config["_license_manager"] = lm
+            except ImportError:
+                pass
+
+        if lm is None:
+            # Last resort: instantiate and cache
             from license_manager import LicenseManager
 
             lm = LicenseManager()
@@ -196,7 +206,9 @@ def upload_video():
             return jsonify({"error": error}), 400
 
         machine_id = g.machine_id
-        timestamp = request.form.get("timestamp", datetime.now(timezone.utc).isoformat())
+        timestamp = request.form.get(
+            "timestamp", datetime.now(timezone.utc).isoformat()
+        )
 
         # Get or create client
         client = db.session.execute(

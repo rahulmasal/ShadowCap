@@ -22,7 +22,9 @@ class Settings(BaseSettings):
     secret_key: str = Field(default_factory=lambda: secrets.token_hex(32))
     admin_password: str = Field(default="changeme123456")  # Should be set via env
     session_timeout: int = Field(default=3600, description="Session timeout in seconds")
-    cors_origins: list = Field(default_factory=lambda: ["*"], description="Allowed CORS origins")
+    cors_origins: list = Field(
+        default_factory=lambda: ["*"], description="Allowed CORS origins"
+    )
 
     # File paths
     upload_folder: Path = Field(default=Path("uploads"))
@@ -36,12 +38,23 @@ class Settings(BaseSettings):
     )
     allowed_extensions: Set[str] = Field(default={"mp4", "avi", "mov", "mkv"})
 
-    # Database settings
-    database_url: str = Field(default="sqlite:///screenrecorder.db")
+    # Database settings — supports SQLite and PostgreSQL
+    # For PostgreSQL: postgresql://user:password@localhost:5432/dbname
+    # For SQLite: sqlite:///screenrecorder.db
+    database_url: str = Field(
+        default="sqlite:///screenrecorder.db",
+        alias="DATABASE_URL",
+        description="Database connection URL (SQLite or PostgreSQL)",
+    )
 
     # Rate limiting
     rate_limit_enabled: bool = True
     rate_limit_per_minute: int = Field(default=60)
+    rate_limit_storage_uri: Optional[str] = Field(
+        default=None,
+        description="Redis URI for distributed rate limiting (e.g. redis://localhost:6379/0). "
+        "If not set, falls back to in-memory rate limiting.",
+    )
 
     # Logging
     log_level: str = Field(default="INFO")
@@ -53,6 +66,27 @@ class Settings(BaseSettings):
     ssl_key: Optional[str] = None
     enforce_https: bool = Field(
         default=False, description="Enforce HTTPS redirects in production"
+    )
+
+    # Retention & cleanup policies
+    audit_log_retention_days: int = Field(
+        default=90,
+        description="Delete audit logs older than this many days (0 = keep forever)",
+    )
+    video_retention_days: int = Field(
+        default=0,
+        description="Delete videos older than this many days (0 = keep forever)",
+    )
+    video_disk_limit_mb: int = Field(
+        default=0,
+        description="Max total video storage in MB before auto-cleanup (0 = no limit)",
+    )
+
+    # Private key encryption
+    key_passphrase: Optional[str] = Field(
+        default=None,
+        description="Passphrase to encrypt the RSA private key at rest. "
+        "If set, private_key.pem will be encrypted with AES-256-CBC.",
     )
 
     @field_validator("admin_password")

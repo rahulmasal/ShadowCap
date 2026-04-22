@@ -86,12 +86,29 @@ class PasswordSecurity:
 
 
 class AuthManager:
-    """Manages authentication with JWT tokens and secure sessions"""
+    """Manages authentication with JWT tokens and secure sessions
+
+    Password hashing/verification is delegated to PasswordSecurity
+    to avoid duplicate logic (see issue #18).
+    """
 
     def __init__(self):
         self.secret_key = settings.secret_key
         self.token_expiry = settings.session_timeout
         self.algorithm = "HS256"
+
+    # ---- Password methods delegate to PasswordSecurity ----
+    @staticmethod
+    def hash_password(password: str) -> str:
+        """Hash a password — delegates to PasswordSecurity"""
+        return PasswordSecurity.hash_password(password)
+
+    @staticmethod
+    def verify_password(password: str, password_hash: str) -> bool:
+        """Verify a password — delegates to PasswordSecurity"""
+        return PasswordSecurity.verify_password(password, password_hash)
+
+    # ---- JWT & Session methods ----
 
     def generate_token(self, user_id: str, expires_in: Optional[int] = None) -> str:
         """Generate a JWT token with unique ID for tracking"""
@@ -172,9 +189,7 @@ def require_csrf(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if request.method in ["POST", "PUT", "DELETE"]:
-            token = request.form.get("csrf_token") or request.headers.get(
-                "X-CSRF-Token"
-            )
+            token = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
             if not auth_manager.validate_csrf_token(token):
                 return jsonify({"error": "Invalid CSRF token"}), 403
         return f(*args, **kwargs)
@@ -185,16 +200,35 @@ def require_csrf(f):
 def rate_limit(limit: int = 60, window: int = 60):
     """Decorator for rate limiting requests
 
+    Supports two backends:
+    1. Redis (recommended for production with multiple workers)
+    2. In-memory dict (fallback for single-worker setups)
+
+    Configure Redis via RATE_LIMIT_STORAGE_URI in environment.
+
     Args:
         limit: Maximum requests allowed in window
         window: Time window in seconds
     """
     from time import time
 
-    # Simple in-memory rate limiting (use Redis in production)
+    # Try Redis backend first
+    _redis_client = None
+    if settings.rate_limit_storage_uri:
+        try:
+            import redis
+
+            _redis_client = redis.from_url(settings.rate_limit_storage_uri, decode_responses=True)
+            _redis_client.ping()
+            logger.info("Rate limiting: using Redis backend at %s", settings.rate_limit_storage_uri)
+        except Exception as e:
+            logger.warning("Redis connection failed, falling back to in-memory: %s", e)
+            _redis_client = None
+
+    # In-memory fallback
     _rate_limit_store = {}
-    _last_cleanup = [0.0]  # mutable container for nonlocal access
-    _CLEANUP_INTERVAL = 300  # Purge stale keys every 5 minutes
+    _last_cleanup = [0.0]
+    _CLEANUP_INTERVAL = 300
 
     def decorator(f):
         @wraps(f)
@@ -202,42 +236,49 @@ def rate_limit(limit: int = 60, window: int = 60):
             if not settings.rate_limit_enabled:
                 return f(*args, **kwargs)
 
-            # Get client identifier (IP + optional user ID)
+            # Get client identifier
             client_id = request.remote_addr
             if hasattr(g, "user_id"):
                 client_id = f"{client_id}:{g.user_id}"
 
-            current_time = time()
-            key = f"{f.__name__}:{client_id}"
+            key = f"ratelimit:{f.__name__}:{client_id}"
 
-            # Periodically purge stale keys to prevent memory leak (#10 fix)
+            # --- Redis backend ---
+            if _redis_client:
+                try:
+                    current = _redis_client.get(key)
+                    count = int(current) if current else 0
+                    if count >= limit:
+                        return jsonify({"error": "Rate limit exceeded. Please try again later."}), 429
+                    pipe = _redis_client.pipeline()
+                    pipe.incr(key)
+                    pipe.expire(key, window)
+                    pipe.execute()
+                    return f(*args, **kwargs)
+                except Exception as e:
+                    logger.warning("Redis rate limit failed, falling back to in-memory: %s", e)
+
+            # --- In-memory fallback ---
+            current_time = time()
+
             if current_time - _last_cleanup[0] > _CLEANUP_INTERVAL:
-                stale_keys = [
-                    k for k, v in _rate_limit_store.items()
-                    if not v or current_time - v[-1] > window
-                ]
+                stale_keys = [k for k, v in _rate_limit_store.items() if not v or current_time - v[-1] > window]
                 for k in stale_keys:
                     del _rate_limit_store[k]
                 _last_cleanup[0] = current_time
 
-            # Clean old entries for this key
             if key in _rate_limit_store:
-                _rate_limit_store[key] = [
-                    t for t in _rate_limit_store[key] if current_time - t < window
-                ]
+                _rate_limit_store[key] = [t for t in _rate_limit_store[key] if current_time - t < window]
             else:
                 _rate_limit_store[key] = []
 
-            # Check limit
             if len(_rate_limit_store[key]) >= limit:
                 return (
                     jsonify({"error": "Rate limit exceeded. Please try again later."}),
                     429,
                 )
 
-            # Record request
             _rate_limit_store[key].append(current_time)
-
             return f(*args, **kwargs)
 
         return decorated_function

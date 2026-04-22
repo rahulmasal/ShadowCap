@@ -7,6 +7,7 @@ import hashlib
 import base64
 import json
 import os
+from typing import Optional
 from datetime import datetime, timedelta, timezone
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
@@ -18,31 +19,44 @@ import secrets
 class LicenseManager:
     """Manages license generation and validation"""
 
-    def __init__(self, private_key=None, public_key=None):
+    def __init__(self, private_key=None, public_key=None, passphrase: str = None):
         """
         Initialize the license manager
 
         Args:
             private_key: RSA private key for signing (server side)
             public_key: RSA public key for verification (client side)
+            passphrase: Optional passphrase to decrypt an encrypted private key
         """
         self.private_key = private_key
         self.public_key = public_key
         self.fernet_key = None
+        self._passphrase = passphrase
 
     @staticmethod
-    def generate_key_pair():
-        """Generate RSA key pair for license signing"""
+    def generate_key_pair(passphrase: Optional[str] = None):
+        """Generate RSA key pair for license signing
+
+        Args:
+            passphrase: Optional passphrase to encrypt the private key.
+                        If provided, the private key is encrypted with
+                        BestAvailableEncryption (AES-256-CBC).
+        """
         private_key = rsa.generate_private_key(
             public_exponent=65537, key_size=2048, backend=default_backend()
         )
         public_key = private_key.public_key()
 
-        # Serialize keys
+        # Serialize keys — encrypt private key if passphrase is provided
+        if passphrase:
+            encryption = serialization.BestAvailableEncryption(passphrase.encode())
+        else:
+            encryption = serialization.NoEncryption()
+
         private_pem = private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
+            encryption_algorithm=encryption,
         )
 
         public_pem = public_key.public_bytes(
@@ -61,15 +75,24 @@ class LicenseManager:
         """
         return Fernet.generate_key().decode("utf-8")
 
-    def load_private_key(self, private_key_pem):
-        """Load private key from PEM string"""
+    def load_private_key(self, private_key_pem, passphrase: str = None):
+        """Load private key from PEM string
+
+        Args:
+            private_key_pem: PEM-encoded private key string or bytes
+            passphrase: Optional passphrase to decrypt the key.
+                        Falls back to the passphrase provided at init time.
+        """
+        pwd = passphrase or self._passphrase or None
+        if pwd:
+            pwd = pwd.encode()
         self.private_key = serialization.load_pem_private_key(
             (
                 private_key_pem.encode()
                 if isinstance(private_key_pem, str)
                 else private_key_pem
             ),
-            password=None,
+            password=pwd,
             backend=default_backend(),
         )
 

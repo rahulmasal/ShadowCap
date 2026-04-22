@@ -40,8 +40,8 @@ def temp_file(temp_dir: Path) -> Generator[Path, None, None]:
 
 @pytest.fixture(scope="session")
 def test_machine_id() -> str:
-    """Return a test machine ID"""
-    return "test_machine_id_1234567890abcdef"
+    """Return a test machine ID (valid hex string matching validator pattern ^[a-fA-F0-9]{32,64}$)"""
+    return "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
 
 
 @pytest.fixture(scope="session")

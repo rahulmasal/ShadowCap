@@ -218,6 +218,8 @@ class Config:
     max_offline_storage_mb: int = 1000  # 1GB max offline storage
     retry_base_delay: float = 1.0  # Base delay for exponential backoff
     retry_max_delay: float = 300.0  # Max delay 5 minutes
+    upload_speed_limit_kbps: int = 0  # 0 = unlimited, else limit in KB/s
+    min_disk_space_mb: int = 500  # Minimum free disk space before recording
 
     # Multi-monitor and region selection
     monitor_selection: int = 1  # Primary monitor by default (1-indexed)
@@ -270,6 +272,56 @@ class Config:
             logger.error(f"Failed to save config: {e}")
 
 
+class ThrottledFileReader:
+    """File-like wrapper that throttles read speed for bandwidth-limited uploads."""
+
+    def __init__(self, file_obj, speed_limit_kbps: int = 0, chunk_size: int = 8192):
+        """
+        Args:
+            file_obj: Underlying file object to read from.
+            speed_limit_kbps: Maximum speed in kilobytes per second. 0 = unlimited.
+            chunk_size: Size of each read chunk in bytes.
+        """
+        self._file = file_obj
+        self._speed_limit_kbps = speed_limit_kbps
+        self._chunk_size = chunk_size
+        self._bytes_read = 0
+        self._start_time: Optional[float] = None
+
+    def read(self, size: int = -1) -> bytes:
+        if self._speed_limit_kbps <= 0:
+            return self._file.read(size)
+
+        if self._start_time is None:
+            self._start_time = time.time()
+
+        # Read in small chunks to allow throttling
+        data = b""
+        remaining = size if size > 0 else float("inf")
+
+        while remaining > 0:
+            to_read = min(self._chunk_size, remaining if remaining != float("inf") else self._chunk_size)
+            chunk = self._file.read(to_read)
+            if not chunk:
+                break
+            data += chunk
+            self._bytes_read += len(chunk)
+            remaining -= len(chunk)
+
+            # Throttle: sleep if we're ahead of the allowed rate
+            elapsed = time.time() - self._start_time
+            allowed_bytes = self._speed_limit_kbps * 1024 * elapsed
+            if self._bytes_read > allowed_bytes:
+                sleep_time = (self._bytes_read - allowed_bytes) / (self._speed_limit_kbps * 1024)
+                time.sleep(min(sleep_time, 1.0))  # Cap sleep at 1s to stay responsive
+
+        return data
+
+    def __getattr__(self, name):
+        """Delegate all other attributes to the underlying file object."""
+        return getattr(self._file, name)
+
+
 class RetryHandler:
     """Handles retry logic with exponential backoff"""
 
@@ -280,9 +332,7 @@ class RetryHandler:
         requests.exceptions.ChunkedEncodingError,
     )
 
-    def __init__(
-        self, base_delay: float = 1.0, max_delay: float = 300.0, max_retries: int = 5
-    ):
+    def __init__(self, base_delay: float = 1.0, max_delay: float = 300.0, max_retries: int = 5):
         self.base_delay = base_delay
         self.max_delay = max_delay
         self.max_retries = max_retries
@@ -347,12 +397,8 @@ class OfflineQueue:
                         if task.video_path.exists():
                             self.queue.append(task)
                         else:
-                            logger.warning(
-                                f"[OfflineQueue] Queued file missing, skipping: {task.video_path}"
-                            )
-                logger.info(
-                    f"[OfflineQueue] Loaded {len(self.queue)} pending uploads from disk"
-                )
+                            logger.warning(f"[OfflineQueue] Queued file missing, skipping: {task.video_path}")
+                logger.info(f"[OfflineQueue] Loaded {len(self.queue)} pending uploads from disk")
             except (json.JSONDecodeError, IOError) as e:
                 logger.warning(f"[OfflineQueue] Failed to load queue: {e}")
         else:
@@ -415,23 +461,15 @@ class OfflineQueue:
 
     def get_total_size(self) -> int:
         """Get total size of queued videos"""
-        return sum(
-            task.video_path.stat().st_size
-            for task in self.queue
-            if task.video_path.exists()
-        )
+        return sum(task.video_path.stat().st_size for task in self.queue if task.video_path.exists())
 
     def _remove_oldest_until_fits(self, needed_space: int) -> None:
         """Remove oldest videos until there's enough space (caller must hold lock)"""
-        while (
-            self.queue and self.get_total_size() + needed_space > self.max_storage_bytes
-        ):
+        while self.queue and self.get_total_size() + needed_space > self.max_storage_bytes:
             oldest = self.queue.pop(0)
             if oldest.video_path.exists():
                 oldest.video_path.unlink()
-                logger.info(
-                    f"Removed oldest video from queue: {oldest.video_path.name}"
-                )
+                logger.info(f"Removed oldest video from queue: {oldest.video_path.name}")
             self._save_queue()
 
     def is_empty(self) -> bool:
@@ -481,9 +519,7 @@ class HeartbeatManager:
                 logger.error(f"[HEARTBEAT] Error in heartbeat loop: {e}", exc_info=True)
 
             # Wait for next interval or stop signal
-            logger.debug(
-                f"[HEARTBEAT] Sleeping for {self.config.heartbeat_interval} seconds"
-            )
+            logger.debug(f"[HEARTBEAT] Sleeping for {self.config.heartbeat_interval} seconds")
             self._stop_event.wait(self.config.heartbeat_interval)
 
     def _send_heartbeat(self) -> None:
@@ -511,9 +547,7 @@ class HeartbeatManager:
                 logger.debug("[HEARTBEAT] Heartbeat successful")
             else:
                 self.server_reachable = False
-                logger.warning(
-                    f"[HEARTBEAT] Heartbeat failed: HTTP {response.status_code} - {response.text[:100]}"
-                )
+                logger.warning(f"[HEARTBEAT] Heartbeat failed: HTTP {response.status_code} - {response.text[:100]}")
 
         except requests.exceptions.RequestException as e:
             self.server_reachable = False
@@ -602,9 +636,7 @@ class ScreenRecorder:
             return
 
         try:
-            self.socket_client = socketio_client.Client(
-                logger=False, engineio_logger=False
-            )
+            self.socket_client = socketio_client.Client(logger=False, engineio_logger=False)
 
             # Register event handlers
             @self.socket_client.event
@@ -637,9 +669,7 @@ class ScreenRecorder:
             bool: True if reconnection successful, False otherwise.
         """
         if self._ws_reconnect_attempts >= self._ws_max_reconnect_attempts:
-            logger.error(
-                f"[WEBSOCKET] Max reconnection attempts ({self._ws_max_reconnect_attempts}) reached"
-            )
+            logger.error(f"[WEBSOCKET] Max reconnection attempts ({self._ws_max_reconnect_attempts}) reached")
             return False
 
         self._ws_reconnect_attempts += 1
@@ -679,9 +709,7 @@ class ScreenRecorder:
         if self._owner_runner is not None:
             self._owner_runner.running = False
 
-        logger.info(
-            "[SIGNAL] Graceful shutdown initiated, waiting for threads to complete..."
-        )
+        logger.info("[SIGNAL] Graceful shutdown initiated, waiting for threads to complete...")
 
     def _load_public_key(self) -> None:
         """Load public key embedded in the application.
@@ -719,9 +747,7 @@ class ScreenRecorder:
             search_paths = [
                 LOG_DIR / self.config.license_file,
                 Path(_script_dir) / self.config.license_file,
-                Path(os.environ.get("PROGRAMFILES", "C:\\Program Files"))
-                / "ScreenRecSvc"
-                / self.config.license_file,
+                Path(os.environ.get("PROGRAMFILES", "C:\\Program Files")) / "ScreenRecSvc" / self.config.license_file,
             ]
             logger.debug(f"[LICENSE] Searching for license in paths: {search_paths}")
             license_path = None
@@ -741,20 +767,14 @@ class ScreenRecorder:
                 self.state = ClientState.LICENSE_INVALID
                 return False, "No license file found"
 
-        logger.debug(
-            f"[LICENSE] Validating license key: {license_key[:20]}... for machine: {self.machine_id}"
-        )
-        is_valid, result = self.license_manager.validate_license(
-            license_key, self.machine_id
-        )
+        logger.debug(f"[LICENSE] Validating license key: {license_key[:20]}... for machine: {self.machine_id}")
+        is_valid, result = self.license_manager.validate_license(license_key, self.machine_id)
 
         if is_valid:
             self.license_valid = True
             self.license_data = result
             self.license_key = license_key
-            logger.info(
-                f"[LICENSE] License validated successfully. Expires: {result['expires_at']}"
-            )
+            logger.info(f"[LICENSE] License validated successfully. Expires: {result['expires_at']}")
             return True, result
         else:
             self.license_valid = False
@@ -782,9 +802,7 @@ class ScreenRecorder:
         # Validate monitor selection
         monitor_idx = self.config.monitor_selection
         if monitor_idx < 1 or monitor_idx >= len(sct.monitors):
-            logger.warning(
-                f"Invalid monitor selection {monitor_idx}, using primary monitor"
-            )
+            logger.warning(f"Invalid monitor selection {monitor_idx}, using primary monitor")
             monitor_idx = 1
 
         monitor = sct.monitors[monitor_idx]
@@ -818,9 +836,7 @@ class ScreenRecorder:
         logger.info(
             f"[CAPTURE] Monitor {monitor_idx}: {monitor_width}x{monitor_height} at ({monitor_left},{monitor_top})"
         )
-        logger.info(
-            f"[CAPTURE] Region: {region_width}x{region_height} at ({region_x},{region_y}) relative to monitor"
-        )
+        logger.info(f"[CAPTURE] Region: {region_width}x{region_height} at ({region_x},{region_y}) relative to monitor")
 
         return region_width, region_height, region_x, region_y
 
@@ -830,9 +846,7 @@ class ScreenRecorder:
         """
         # Validate monitor selection
         if monitor_idx < 1 or monitor_idx >= len(sct.monitors):
-            logger.warning(
-                f"Invalid monitor selection {monitor_idx}, using primary monitor"
-            )
+            logger.warning(f"Invalid monitor selection {monitor_idx}, using primary monitor")
             monitor_idx = 1
 
         monitor = sct.monitors[monitor_idx]
@@ -876,6 +890,22 @@ class ScreenRecorder:
         if self.state == ClientState.RECORDING:
             logger.warning("[START] Recording already in progress")
             return True
+
+        # Pre-recording disk space check
+        import shutil
+
+        try:
+            usage = shutil.disk_usage(self.video_dir if hasattr(self, "video_dir") and self.video_dir else Path.home())
+            min_free_mb = getattr(self.config, "min_disk_space_mb", 100)
+            if usage.free < min_free_mb * 1024 * 1024:
+                logger.error(
+                    "[START] Insufficient disk space: %.1f MB free (minimum: %d MB)",
+                    usage.free / (1024 * 1024),
+                    min_free_mb,
+                )
+                return False
+        except Exception as e:
+            logger.warning("[START] Could not check disk space: %s", e)
 
         # Windows Session 0 isolation check:
         # Services run in Session 0 which has no access to the user's display.
@@ -933,15 +963,11 @@ class ScreenRecorder:
         # Start heartbeat manager
         if self.license_key:
             logger.info("[START] Starting heartbeat manager...")
-            self.heartbeat_manager = HeartbeatManager(
-                self.config, self.license_key, self.machine_id
-            )
+            self.heartbeat_manager = HeartbeatManager(self.config, self.license_key, self.machine_id)
             self.heartbeat_manager.start()
             logger.info("[START] Heartbeat manager started")
         else:
-            logger.warning(
-                "[START] No license key available, skipping heartbeat manager"
-            )
+            logger.warning("[START] No license key available, skipping heartbeat manager")
 
         logger.info("[START] Recording started successfully")
         return True
@@ -1002,22 +1028,16 @@ class ScreenRecorder:
 
         # Wait for recording thread to finish
         if self.recording_thread is not None and self.recording_thread.is_alive():
-            logger.info(
-                f"[STOP] Waiting for recording thread to complete (timeout: {timeout}s)..."
-            )
+            logger.info(f"[STOP] Waiting for recording thread to complete (timeout: {timeout}s)...")
             self.recording_thread.join(timeout=timeout)
             if self.recording_thread.is_alive():
-                logger.warning(
-                    "[STOP] Recording thread did not complete within timeout"
-                )
+                logger.warning("[STOP] Recording thread did not complete within timeout")
             else:
                 logger.info("[STOP] Recording thread completed")
 
         # Wait for upload thread to finish
         if self.upload_thread is not None and self.upload_thread.is_alive():
-            logger.info(
-                f"[STOP] Waiting for upload thread to complete (timeout: {timeout}s)..."
-            )
+            logger.info(f"[STOP] Waiting for upload thread to complete (timeout: {timeout}s)...")
             self.upload_thread.join(timeout=timeout)
             if self.upload_thread.is_alive():
                 logger.warning("[STOP] Upload thread did not complete within timeout")
@@ -1090,8 +1110,7 @@ class ScreenRecorder:
             logger.info(f"[SESSION] Active user session ID: {active_session}")
             if active_session == 0 or active_session == 0xFFFFFFFF:
                 logger.warning(
-                    "[SESSION] No active interactive user session found. "
-                    "Cannot relaunch in user session."
+                    "[SESSION] No active interactive user session found. " "Cannot relaunch in user session."
                 )
                 return False
 
@@ -1123,12 +1142,8 @@ class ScreenRecorder:
 
             # Load user environment
             env_block = ctypes.c_void_p()
-            if not userenv.CreateEnvironmentBlock(
-                ctypes.byref(env_block), h_dup_token, False
-            ):
-                logger.warning(
-                    "[SESSION] CreateEnvironmentBlock failed, using inherited env"
-                )
+            if not userenv.CreateEnvironmentBlock(ctypes.byref(env_block), h_dup_token, False):
+                logger.warning("[SESSION] CreateEnvironmentBlock failed, using inherited env")
                 env_block = None
 
             # Build command line: same interpreter + this script
@@ -1175,10 +1190,7 @@ class ScreenRecorder:
 
             pi = PROCESS_INFORMATION()
 
-            CREATION_FLAGS = (
-                0x00000010  # CREATE_NEW_CONSOLE
-                | 0x00000400  # CREATE_UNICODE_ENVIRONMENT
-            )
+            CREATION_FLAGS = 0x00000010 | 0x00000400  # CREATE_NEW_CONSOLE  # CREATE_UNICODE_ENVIRONMENT
 
             result = advapi32.CreateProcessAsUserW(
                 h_dup_token,
@@ -1200,10 +1212,7 @@ class ScreenRecorder:
             kernel32.CloseHandle(h_dup_token)
 
             if result:
-                logger.info(
-                    f"[SESSION] Successfully launched recorder in user session "
-                    f"(PID: {pi.dwProcessId})"
-                )
+                logger.info(f"[SESSION] Successfully launched recorder in user session " f"(PID: {pi.dwProcessId})")
                 kernel32.CloseHandle(pi.hProcess)
                 kernel32.CloseHandle(pi.hThread)
                 return True
@@ -1213,9 +1222,7 @@ class ScreenRecorder:
                 return False
 
         except Exception as exc:
-            logger.error(
-                f"[SESSION] Failed to relaunch in user session: {exc}", exc_info=True
-            )
+            logger.error(f"[SESSION] Failed to relaunch in user session: {exc}", exc_info=True)
             return False
 
     def _record_loop(self) -> None:
@@ -1241,17 +1248,13 @@ class ScreenRecorder:
         width = capture_region["width"]
         height = capture_region["height"]
 
-        logger.info(
-            f"[RECORD] Capture region: {width}x{height} at ({capture_region['left']}, {capture_region['top']})"
-        )
+        logger.info(f"[RECORD] Capture region: {width}x{height} at ({capture_region['left']}, {capture_region['top']})")
 
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
 
         chunk_start_time = time.time()
         video_path = self._get_video_path()
-        self.video_writer = cv2.VideoWriter(
-            str(video_path), fourcc, fps, (width, height)
-        )
+        self.video_writer = cv2.VideoWriter(str(video_path), fourcc, fps, (width, height))
 
         # Check if video writer opened successfully
         if not self.video_writer.isOpened():
@@ -1259,9 +1262,7 @@ class ScreenRecorder:
             self.state = ClientState.ERROR
             return
 
-        logger.info(
-            f"[RECORD] Started new video chunk: {video_path.name} (resolution: {width}x{height}, fps: {fps})"
-        )
+        logger.info(f"[RECORD] Started new video chunk: {video_path.name} (resolution: {width}x{height}, fps: {fps})")
 
         frames_captured = 0
         consecutive_black_frames = 0
@@ -1285,9 +1286,7 @@ class ScreenRecorder:
             elif self.state == ClientState.PAUSED:
                 # Just resumed
                 self.state = ClientState.RECORDING
-                logger.info(
-                    f"[RECORD] Recording resumed after {paused_time:.1f}s pause"
-                )
+                logger.info(f"[RECORD] Recording resumed after {paused_time:.1f}s pause")
 
             try:
                 # Capture screen from selected monitor with region
@@ -1302,15 +1301,11 @@ class ScreenRecorder:
 
                 # Log frame properties occasionally for debugging
                 if frames_captured == 0:
-                    logger.info(
-                        f"[RECORD] Frame properties: shape={frame.shape}, dtype={frame.dtype}"
-                    )
+                    logger.info(f"[RECORD] Frame properties: shape={frame.shape}, dtype={frame.dtype}")
                     # Sample a few pixel values to see if we're getting valid data
                     if frame.shape[0] > 10 and frame.shape[1] > 10:
                         sample = frame[5:10, 5:10]
-                        logger.info(
-                            f"[RECORD] Sample pixel values (BGRA): {sample.flatten()[:12]}"
-                        )
+                        logger.info(f"[RECORD] Sample pixel values (BGRA): {sample.flatten()[:12]}")
 
                 # Check if frame appears to be black (all zeros or very low values)
                 if frames_captured < 100:  # Only check first 100 frames to avoid spam
@@ -1334,13 +1329,9 @@ class ScreenRecorder:
                                             f"[RECORD] Monitor {test_monitor_idx} mean pixel value: {test_mean:.2f}"
                                         )
                                 except Exception as monitor_err:
-                                    logger.debug(
-                                        f"[RECORD] Error testing monitor {test_monitor_idx}: {monitor_err}"
-                                    )
+                                    logger.debug(f"[RECORD] Error testing monitor {test_monitor_idx}: {monitor_err}")
                     else:
-                        consecutive_black_frames = (
-                            0  # Reset counter if we get a bright frame
-                        )
+                        consecutive_black_frames = 0  # Reset counter if we get a bright frame
 
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
 
@@ -1354,34 +1345,24 @@ class ScreenRecorder:
                     # Save current chunk and start new one
                     if self.video_writer is not None:
                         self.video_writer.release()
-                        logger.info(
-                            f"[RECORD] Released video writer for chunk: {video_path.name}"
-                        )
+                        logger.info(f"[RECORD] Released video writer for chunk: {video_path.name}")
 
                     # Thread-safe append to video_chunks
                     with self._video_chunks_lock:
                         self.video_chunks.append(video_path)
-                    logger.info(
-                        f"[RECORD] Video chunk completed: {video_path.name} (frames: {frames_captured})"
-                    )
+                    logger.info(f"[RECORD] Video chunk completed: {video_path.name} (frames: {frames_captured})")
 
                     # Start new chunk
                     chunk_start_time = time.time()
                     video_path = self._get_video_path()
-                    self.video_writer = cv2.VideoWriter(
-                        str(video_path), fourcc, fps, (width, height)
-                    )
+                    self.video_writer = cv2.VideoWriter(str(video_path), fourcc, fps, (width, height))
                     # Check if new video writer opened successfully
                     if not self.video_writer.isOpened():
-                        logger.error(
-                            f"[RECORD] Failed to open video writer for {video_path}"
-                        )
+                        logger.error(f"[RECORD] Failed to open video writer for {video_path}")
                         return
                     logger.info(f"[RECORD] Started new video chunk: {video_path.name}")
                     frames_captured = 0
-                    consecutive_black_frames = (
-                        0  # Reset black frame counter for new chunk
-                    )
+                    consecutive_black_frames = 0  # Reset black frame counter for new chunk
 
                 time.sleep(1.0 / fps)
             except Exception as e:
@@ -1396,18 +1377,14 @@ class ScreenRecorder:
                 # First, process offline queue
                 queue_count = self.offline_queue.count()
                 if queue_count > 0:
-                    logger.info(
-                        f"[UPLOAD] Processing {queue_count} items in offline queue"
-                    )
+                    logger.info(f"[UPLOAD] Processing {queue_count} items in offline queue")
 
                 while not self.offline_queue.is_empty():
                     task = self.offline_queue.get_next()
                     if task is None:
                         break
 
-                    logger.info(
-                        f"[UPLOAD] Attempting upload of queued video: {task.video_path.name}"
-                    )
+                    logger.info(f"[UPLOAD] Attempting upload of queued video: {task.video_path.name}")
                     success = self._upload_video_with_retry(task)
                     if success:
                         self.offline_queue.remove(task)
@@ -1418,9 +1395,7 @@ class ScreenRecorder:
                                 f"[UPLOAD] Successfully uploaded and deleted queued video: {task.video_path.name} ({file_size} bytes)"
                             )
                         else:
-                            logger.warning(
-                                f"[UPLOAD] Queued video already deleted: {task.video_path.name}"
-                            )
+                            logger.warning(f"[UPLOAD] Queued video already deleted: {task.video_path.name}")
                     else:
                         # Server still unreachable, wait and retry later
                         logger.warning(
@@ -1434,9 +1409,7 @@ class ScreenRecorder:
 
                 chunks_count = len(chunks_to_process)
                 if chunks_count > 0:
-                    logger.info(
-                        f"[UPLOAD] Found {chunks_count} completed chunks ready for upload"
-                    )
+                    logger.info(f"[UPLOAD] Found {chunks_count} completed chunks ready for upload")
 
                     for video_path in chunks_to_process:
                         if video_path.exists():
@@ -1455,34 +1428,24 @@ class ScreenRecorder:
                                         self.video_chunks.remove(video_path)
                                 try:
                                     video_path.unlink()
-                                    logger.info(
-                                        f"[UPLOAD] Successfully uploaded and deleted chunk: {video_path.name}"
-                                    )
+                                    logger.info(f"[UPLOAD] Successfully uploaded and deleted chunk: {video_path.name}")
                                 except OSError as e:
-                                    logger.error(
-                                        f"[UPLOAD] Failed to delete uploaded chunk {video_path.name}: {e}"
-                                    )
+                                    logger.error(f"[UPLOAD] Failed to delete uploaded chunk {video_path.name}: {e}")
                             else:
                                 # Add to offline queue for later
-                                logger.warning(
-                                    f"[UPLOAD] Upload failed, moving to offline queue: {video_path.name}"
-                                )
+                                logger.warning(f"[UPLOAD] Upload failed, moving to offline queue: {video_path.name}")
                                 self.offline_queue.add(video_path)
                                 with self._video_chunks_lock:
                                     if video_path in self.video_chunks:
                                         self.video_chunks.remove(video_path)
                         else:
-                            logger.warning(
-                                f"[UPLOAD] Chunk file missing, removing from tracking: {video_path.name}"
-                            )
+                            logger.warning(f"[UPLOAD] Chunk file missing, removing from tracking: {video_path.name}")
                             with self._video_chunks_lock:
                                 if video_path in self.video_chunks:
                                     self.video_chunks.remove(video_path)
 
                 # Wait for next interval
-                logger.debug(
-                    f"[UPLOAD] Upload loop sleeping for {self.config.upload_interval} seconds"
-                )
+                logger.debug(f"[UPLOAD] Upload loop sleeping for {self.config.upload_interval} seconds")
                 self._stop_event.wait(self.config.upload_interval)
 
             except Exception as e:
@@ -1496,15 +1459,19 @@ class ScreenRecorder:
             return True  # Remove from queue
 
         file_size = task.video_path.stat().st_size
-        logger.info(
-            f"[UPLOAD] Starting upload attempt for: {task.video_path.name} ({file_size} bytes)"
-        )
+        logger.info(f"[UPLOAD] Starting upload attempt for: {task.video_path.name} ({file_size} bytes)")
         url = f"{self.config.server_url}/api/v1/upload"
 
         for attempt in range(task.retry_count, self.retry_handler.max_retries):
             try:
                 with open(task.video_path, "rb") as f:
-                    files = {"video": (task.video_path.name, f, "video/mp4")}
+                    # Wrap with throttled reader if speed limit is configured
+                    upload_file = (
+                        ThrottledFileReader(f, self.config.upload_speed_limit_kbps)
+                        if self.config.upload_speed_limit_kbps > 0
+                        else f
+                    )
+                    files = {"video": (task.video_path.name, upload_file, "video/mp4")}
                     headers = {
                         "X-License-Key": self.license_key or "",
                         "X-Machine-ID": self.machine_id,
@@ -1517,14 +1484,10 @@ class ScreenRecorder:
                     logger.debug(
                         f"[UPLOAD] Attempt {attempt + 1}/{self.retry_handler.max_retries} for {task.video_path.name}"
                     )
-                    response = requests.post(
-                        url, files=files, data=data, headers=headers, timeout=60
-                    )
+                    response = requests.post(url, files=files, data=data, headers=headers, timeout=60)
 
                     if response.status_code == 200:
-                        logger.info(
-                            f"[UPLOAD] SUCCESS: Video uploaded successfully: {task.video_path.name}"
-                        )
+                        logger.info(f"[UPLOAD] SUCCESS: Video uploaded successfully: {task.video_path.name}")
                         return True
                     elif 500 <= response.status_code < 600:
                         # Server error, retry
@@ -1542,25 +1505,17 @@ class ScreenRecorder:
             except requests.exceptions.RequestException as e:
                 task.retry_count = attempt + 1
                 task.last_error = str(e)
-                logger.warning(
-                    f"[UPLOAD] Network error on attempt {attempt + 1} for {task.video_path.name}: {e}"
-                )
+                logger.warning(f"[UPLOAD] Network error on attempt {attempt + 1} for {task.video_path.name}: {e}")
 
                 if self.retry_handler.should_retry(attempt + 1, e):
                     delay = self.retry_handler.get_delay(attempt + 1)
-                    logger.warning(
-                        f"[UPLOAD] Upload failed, retrying in {delay:.1f}s: {e}"
-                    )
+                    logger.warning(f"[UPLOAD] Upload failed, retrying in {delay:.1f}s: {e}")
                     time.sleep(delay)
                 else:
-                    logger.error(
-                        f"[UPLOAD] Upload failed after {attempt + 1} attempts for {task.video_path.name}: {e}"
-                    )
+                    logger.error(f"[UPLOAD] Upload failed after {attempt + 1} attempts for {task.video_path.name}: {e}")
                     return False
 
-        logger.error(
-            f"[UPLOAD] Giving up on {task.video_path.name} after {self.retry_handler.max_retries} attempts"
-        )
+        logger.error(f"[UPLOAD] Giving up on {task.video_path.name} after {self.retry_handler.max_retries} attempts")
         return False
 
 
@@ -1594,18 +1549,14 @@ class HiddenRunner:
             logger.info("[HIDDEN_RUNNER] Starting recording...")
             if self.recorder.start_recording():
                 self.running = True
-                logger.info(
-                    "[HIDDEN_RUNNER] Screen recorder service started successfully"
-                )
+                logger.info("[HIDDEN_RUNNER] Screen recorder service started successfully")
                 return True
             else:
                 logger.error("[HIDDEN_RUNNER] Failed to start recording")
                 return False
 
         except Exception as e:
-            logger.error(
-                f"[HIDDEN_RUNNER] Failed to start hidden runner: {e}", exc_info=True
-            )
+            logger.error(f"[HIDDEN_RUNNER] Failed to start hidden runner: {e}", exc_info=True)
             return False
 
     def stop(self) -> None:
@@ -1613,9 +1564,7 @@ class HiddenRunner:
         logger.info("[RUNNER] Stopping screen recorder service...")
         self.running = False  # Set this first so main loop exits
         if self.recorder:
-            self.recorder.stop_recording(
-                timeout=10.0
-            )  # Give threads more time to complete
+            self.recorder.stop_recording(timeout=10.0)  # Give threads more time to complete
         logger.info("[RUNNER] Screen recorder service stopped")
 
     def _hide_console(self) -> None:
@@ -1623,9 +1572,7 @@ class HiddenRunner:
         try:
             import ctypes
 
-            ctypes.windll.user32.ShowWindow(
-                ctypes.windll.kernel32.GetConsoleWindow(), 0
-            )
+            ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 0)
         except (ImportError, AttributeError, OSError):
             pass
 
@@ -1646,9 +1593,7 @@ class HiddenRunner:
             except SystemExit:
                 logger.info("[RUNNER] System exit received, stopping...")
             except Exception as e:
-                logger.error(
-                    f"[RUNNER] Unexpected error in main loop: {e}", exc_info=True
-                )
+                logger.error(f"[RUNNER] Unexpected error in main loop: {e}", exc_info=True)
             finally:
                 self.stop()
 

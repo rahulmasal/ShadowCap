@@ -59,6 +59,7 @@ class WebSocketManager:
 
         try:
             from config import settings
+
             self.socketio = SocketIO(
                 app,
                 cors_allowed_origins=settings.cors_origins,
@@ -238,7 +239,7 @@ class WebSocketManager:
             "client_heartbeat",
             {
                 "machine_id": machine_id,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 **(metadata or {}),
             },
         )

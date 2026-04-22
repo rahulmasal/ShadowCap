@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install server dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r server/requirements.txt
+
+      - name: Install shared module
+        run: |
+          pip install -e .
+
+      - name: Install test dependencies
+        run: |
+          pip install pytest pytest-cov
+
+      - name: Run tests
+        run: |
+          pytest tests/ -v --cov=shared --cov=server --cov-report=term-missing
+        env:
+          PYTHONPATH: "server:shared:."
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install linting tools
+        run: pip install flake8 black
+
+      - name: Run flake8
+        run: |
+          flake8 server/ shared/ tests/ --max-line-length=120 --exclude=migrations,__pycache__
+
+      - name: Check black formatting
+        run: |
+          black --check server/ shared/ tests/ --line-length=120
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -f server/Dockerfile -t shadowcap-server:test .
+
+      - name: Verify image builds
+        run: docker images shadowcap-server:test

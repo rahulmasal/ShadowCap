@@ -165,12 +165,8 @@ class ApiKey(db.Model):
 def init_db(app) -> None:
     """Initialize database with app"""
     db.init_app(app)
-    
-    import sys
-    # Don't create tables if we're running database migrations
-    if not (len(sys.argv) > 1 and sys.argv[1] == 'db'):
-        with app.app_context():
-            db.create_all()
+    # Schema management is handled by Flask-Migrate (flask db upgrade).
+    # Do NOT call db.create_all() here — it conflicts with migration versioning.
 
 
 def get_or_create_client(machine_id: str, system_info: Optional[dict] = None) -> Client:

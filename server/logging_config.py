@@ -119,9 +119,13 @@ def setup_logging(
     console_handler.setFormatter(formatter)
     root_logger.addHandler(console_handler)
 
-    # Add file handler if specified
+    # Add file handler if specified (with rotation to prevent unbounded growth)
     if log_file:
-        file_handler = logging.FileHandler(log_file)
+        from logging.handlers import RotatingFileHandler
+
+        file_handler = RotatingFileHandler(
+            log_file, maxBytes=10 * 1024 * 1024, backupCount=5
+        )
         file_handler.setLevel(log_level)
         file_formatter = StructuredFormatter(service_name)
         file_handler.setFormatter(file_formatter)
