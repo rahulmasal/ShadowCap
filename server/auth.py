@@ -178,7 +178,7 @@ def require_auth(f):
         # No valid authentication found - redirect to login page
         from flask import redirect, url_for
 
-        return redirect(url_for("admin_login"))
+        return redirect(url_for("admin.admin_login"))
 
     return decorated_function
 

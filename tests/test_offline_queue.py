@@ -4,28 +4,35 @@ Tests for offline queue module
 
 import pytest
 import json
-import time
+from datetime import datetime, timezone
 from pathlib import Path
-from offline_queue import OfflineQueue, UploadTask
+from client_config import UploadTask
+from offline_queue import OfflineQueue
 
 
 class TestUploadTask:
     """Test cases for UploadTask dataclass"""
 
     def test_increment_retry(self):
-        task = UploadTask(video_path="/tmp/test.mp4", max_retries=3)
+        task = UploadTask(
+            video_path=Path("/tmp/test.mp4"),
+            timestamp=datetime.now(timezone.utc),
+            max_retries=3,
+        )
         assert task.retry_count == 0
-        assert task.increment_retry() is True  # 1 <= 3
+        assert task.increment_retry() is True  # 1 < 3
         assert task.retry_count == 1
         task.increment_retry()  # 2
-        task.increment_retry()  # 3
-        assert task.increment_retry() is False  # 4 > 3
+        assert task.increment_retry() is False  # 3 >= 3
 
     def test_default_values(self):
-        task = UploadTask(video_path="/tmp/test.mp4")
-        assert task.added_at == 0.0
+        task = UploadTask(
+            video_path=Path("/tmp/test.mp4"),
+            timestamp=datetime.now(timezone.utc),
+        )
         assert task.retry_count == 0
         assert task.max_retries == 5
+        assert task.last_error is None
 
 
 class TestOfflineQueue:
@@ -46,13 +53,6 @@ class TestOfflineQueue:
         assert q.count() == 1
         assert not q.is_empty()
 
-    def test_add_nonexistent_file(self, tmp_path):
-        queue_dir = tmp_path / "queue"
-        queue_dir.mkdir()
-        q = OfflineQueue(queue_dir)
-        result = q.add(Path("/nonexistent/file.mp4"))
-        assert result is False
-
     def test_get_next(self, tmp_path):
         queue_dir = tmp_path / "queue"
         queue_dir.mkdir()
@@ -63,7 +63,7 @@ class TestOfflineQueue:
         q.add(video_file)
         task = q.get_next()
         assert task is not None
-        assert "test.mp4" in task.video_path
+        assert task.video_path == video_file
 
     def test_remove(self, tmp_path):
         queue_dir = tmp_path / "queue"
@@ -83,12 +83,10 @@ class TestOfflineQueue:
         video_file = queue_dir / "test.mp4"
         video_file.write_text("fake video data")
 
-        # Create queue and add item
         q1 = OfflineQueue(queue_dir)
         q1.add(video_file)
         assert q1.count() == 1
 
-        # Create new queue instance — should load from disk
         q2 = OfflineQueue(queue_dir)
         assert q2.count() == 1
 

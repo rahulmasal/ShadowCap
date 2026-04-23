@@ -15,6 +15,8 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "shared"))
 sys.path.insert(0, str(project_root / "server"))
+# Client path AFTER server to avoid config name collisions
+sys.path.append(str(project_root / "client"))
 
 
 @pytest.fixture(scope="session")
@@ -81,17 +83,52 @@ def mock_config(temp_dir: Path) -> dict:
     }
 
 
+@pytest.fixture(scope="function")
+def app(tmp_path):
+    """Create Flask test app with in-memory SQLite database"""
+    os.environ["SECRET_KEY"] = "test-secret-key-for-integration-tests"
+    os.environ["ADMIN_PASSWORD"] = "test_admin_password_123"
+    os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+    os.environ["UPLOAD_FOLDER"] = str(tmp_path / "uploads")
+    os.environ["LICENSE_FOLDER"] = str(tmp_path / "licenses")
+    os.environ["KEYS_FOLDER"] = str(tmp_path / "keys")
+    os.environ["CLIENTS_FOLDER"] = str(tmp_path / "clients")
+    os.environ["RATE_LIMIT_ENABLED"] = "false"
+
+    for d in ["uploads", "licenses", "keys", "clients"]:
+        (tmp_path / d).mkdir()
+
+    # Reset settings singleton so it picks up test env vars
+    import config as config_module
+    config_module._settings = None
+    config_module.settings = config_module.get_settings()
+
+    from app import app as flask_app
+
+    flask_app.config["TESTING"] = True
+    flask_app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
+
+    with flask_app.app_context():
+        from models import db
+        db.create_all()
+        yield flask_app
+        db.drop_all()
+
+
+@pytest.fixture(scope="function")
+def client(app):
+    """Flask test client"""
+    return app.test_client()
+
+
 # Skip tests that require actual hardware
 def pytest_collection_modifyitems(config, items):
     """Add custom markers to tests"""
     for item in items:
-        # Mark tests that require actual screen capture
         if "screen_capture" in item.nodeid.lower():
             item.add_marker(pytest.mark.screen_capture)
-        # Mark tests that require audio hardware
         if "audio" in item.nodeid.lower():
             item.add_marker(pytest.mark.audio)
-        # Mark tests that require network
         if "network" in item.nodeid.lower() or "upload" in item.nodeid.lower():
             item.add_marker(pytest.mark.network)
 
