@@ -39,6 +39,11 @@ class Client(db.Model):
         "License", back_populates="client", uselist=False
     )
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if "is_active" not in kwargs:
+            self.is_active = True
+
     def __repr__(self) -> str:
         return f"<Client {self.machine_id[:12]}...>"
 

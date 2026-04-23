@@ -78,7 +78,7 @@ class PasswordSecurity:
             return False, f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
 
         # Check for common weak passwords
-        weak_passwords = ["password", "admin", "123456", "password123", "admin123"]
+        weak_passwords = ["password", "admin", "123456", "password123", "admin123", "password123456"]
         if password.lower() in weak_passwords:
             return False, "Password is too common, please choose a stronger one"
 
